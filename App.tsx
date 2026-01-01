@@ -1,16 +1,20 @@
+
 import React from 'react';
-import { HashRouter as Router, Routes, Route } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Home } from './views/Home';
 import { BottomNav } from './components/Navigation';
 import { Analytics } from './views/Analytics';
-import { AuthProvider } from './services/authContext';
+import { ChecklistPage } from './views/ChecklistPage';
+import { AuthProvider, useAuth } from './services/authContext';
+import { Onboarding } from './views/Onboarding';
+import { Accounts } from './views/Accounts';
 import { 
   StatePage, EffortPage, AchievementsPage, 
   ReflectionsPage, MemoriesPage, FuturePage 
 } from './views/CategoryPages';
 import { StorageService } from './services/storage';
 
-// Re-implementing ArchiveView here briefly to ensure it works with new layout if not moved
+// Re-implementing ArchiveView
 const Archive = () => {
   const [entries, setEntries] = React.useState<any[]>([]);
 
@@ -36,7 +40,7 @@ const Archive = () => {
                 </div>
                 {entry.achievements.dailyWins && <p className="font-serif text-gray-600 italic mb-3">"{entry.achievements.dailyWins}"</p>}
                 <div className="flex flex-wrap gap-2">
-                   {entry.state.descriptors.map((d: string) => (
+                   {entry.state.descriptors?.map((d: string) => (
                      <span key={d} className="text-[10px] uppercase font-bold text-stone-500 bg-stone-50 px-2 py-1 rounded">{d}</span>
                    ))}
                 </div>
@@ -49,27 +53,46 @@ const Archive = () => {
   );
 };
 
+const ProtectedContent = () => {
+  const { user, loading } = useAuth();
+  
+  if (loading) return (
+    <div className="min-h-screen bg-paper flex items-center justify-center">
+      <div className="w-10 h-10 border-4 border-stone-200 border-t-organic-600 rounded-full animate-spin"></div>
+    </div>
+  );
+
+  if (!user) return <Onboarding />;
+
+  return (
+    <div className="bg-paper min-h-screen font-sans selection:bg-organic-200 selection:text-organic-900">
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/analytics" element={<Analytics />} />
+        <Route path="/checklist" element={<ChecklistPage />} />
+        <Route path="/accounts" element={<Accounts />} />
+        
+        {/* Logging Categories */}
+        <Route path="/log/state" element={<StatePage />} />
+        <Route path="/log/effort" element={<EffortPage />} />
+        <Route path="/log/achievements" element={<AchievementsPage />} />
+        <Route path="/log/reflections" element={<ReflectionsPage />} />
+        <Route path="/log/memories" element={<MemoriesPage />} />
+        <Route path="/log/future" element={<FuturePage />} />
+        
+        <Route path="/archive" element={<Archive />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+      <BottomNav />
+    </div>
+  );
+};
+
 function App() {
   return (
     <AuthProvider>
       <Router>
-        <div className="bg-paper min-h-screen font-sans selection:bg-organic-200 selection:text-organic-900">
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/analytics" element={<Analytics />} />
-            
-            {/* Logging Categories */}
-            <Route path="/log/state" element={<StatePage />} />
-            <Route path="/log/effort" element={<EffortPage />} />
-            <Route path="/log/achievements" element={<AchievementsPage />} />
-            <Route path="/log/reflections" element={<ReflectionsPage />} />
-            <Route path="/log/memories" element={<MemoriesPage />} />
-            <Route path="/log/future" element={<FuturePage />} />
-            
-            <Route path="/archive" element={<Archive />} />
-          </Routes>
-          <BottomNav />
-        </div>
+        <ProtectedContent />
       </Router>
     </AuthProvider>
   );

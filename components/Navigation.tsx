@@ -1,11 +1,13 @@
+
 import React, { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { 
   Activity, Clock, Trophy, Feather, Camera, Sun, 
-  Disc, BarChart2, X, Menu 
+  Disc, BarChart2, X, Menu, ListChecks, UserCircle 
 } from 'lucide-react';
 
 const CATEGORIES = [
+  { id: 'checklist', path: '/checklist', icon: ListChecks, label: 'Habits' },
   { id: 'state', path: '/log/state', icon: Activity, label: 'State' },
   { id: 'effort', path: '/log/effort', icon: Clock, label: 'Effort' },
   { id: 'achievements', path: '/log/achievements', icon: Trophy, label: 'Wins' },
@@ -36,29 +38,35 @@ export const BottomNav = () => {
         {/* Expanded Menu */}
         <nav 
           className={`
-            mb-6 bg-ink text-paper rounded-2xl shadow-float p-4
-            flex flex-col gap-4 min-w-[300px] pointer-events-auto
-            origin-bottom transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]
+            mb-6 bg-ink text-paper rounded-3xl shadow-float p-5
+            flex flex-col gap-6 min-w-[340px] pointer-events-auto
+            origin-bottom transition-all duration-400 ease-[cubic-bezier(0.16,1,0.3,1)]
             ${isOpen ? 'scale-100 opacity-100 translate-y-0' : 'scale-75 opacity-0 translate-y-12 pointer-events-none'}
           `}
         >
           {/* Main Rows */}
-          <div className="flex justify-between items-center border-b border-white/10 pb-4">
+          <div className="flex justify-around items-center border-b border-white/10 pb-5">
              <NavLink to="/" className="flex flex-col items-center gap-1 group">
-                <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center group-hover:bg-white/20 transition-colors">
-                  <Disc size={20} />
+                <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center group-hover:bg-white/20 transition-colors">
+                  <Disc size={22} />
                 </div>
-                <span className="text-[10px] uppercase font-bold tracking-widest text-gray-400">Home</span>
+                <span className="text-[10px] uppercase font-bold tracking-[0.2em] text-gray-500">Archive</span>
              </NavLink>
              <NavLink to="/analytics" className="flex flex-col items-center gap-1 group">
-                <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center group-hover:bg-white/20 transition-colors">
-                  <BarChart2 size={20} />
+                <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center group-hover:bg-white/20 transition-colors">
+                  <BarChart2 size={22} />
                 </div>
-                <span className="text-[10px] uppercase font-bold tracking-widest text-gray-400">Data</span>
+                <span className="text-[10px] uppercase font-bold tracking-[0.2em] text-gray-500">Patterns</span>
+             </NavLink>
+             <NavLink to="/accounts" className="flex flex-col items-center gap-1 group">
+                <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center group-hover:bg-white/20 transition-colors">
+                  <UserCircle size={22} />
+                </div>
+                <span className="text-[10px] uppercase font-bold tracking-[0.2em] text-gray-500">Identity</span>
              </NavLink>
           </div>
 
-          <div className="grid grid-cols-3 gap-y-4 gap-x-2">
+          <div className="grid grid-cols-4 gap-y-5 gap-x-2">
             {CATEGORIES.map(cat => (
               <NavLink
                 key={cat.id}
@@ -69,22 +77,22 @@ export const BottomNav = () => {
                 `}
               >
                 <cat.icon size={20} strokeWidth={1.5} />
-                <span className="text-[10px] font-bold uppercase tracking-wide">{cat.label}</span>
+                <span className="text-[9px] font-bold uppercase tracking-wider">{cat.label}</span>
               </NavLink>
             ))}
           </div>
         </nav>
 
-        {/* The Dot / Trigger Button */}
+        {/* The Trigger Button */}
         <button 
           onClick={() => setIsOpen(!isOpen)}
           className={`
-            pointer-events-auto w-14 h-14 rounded-full shadow-2xl flex items-center justify-center
+            pointer-events-auto w-16 h-16 rounded-full shadow-2xl flex items-center justify-center
             transition-all duration-300 z-50
             ${isOpen ? 'bg-white text-ink rotate-90 scale-90' : 'bg-ink text-white hover:scale-105 active:scale-95'}
           `}
         >
-          {isOpen ? <X size={24} /> : <div className="w-2 h-2 bg-white rounded-full" />} 
+          {isOpen ? <X size={28} /> : <div className="w-2.5 h-2.5 bg-white rounded-full shadow-[0_0_10px_rgba(255,255,255,0.5)]" />} 
         </button>
       </div>
     </>

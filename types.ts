@@ -1,3 +1,4 @@
+
 export type RatingScale = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
 
 // A. Daily State
@@ -71,6 +72,7 @@ export interface DailyEntry {
   reflections: Reflections;
   memory: Memory;
   future: Future;
+  checklist: Record<string, boolean>; // New: Daily Habit Tracking
 }
 
 export interface Note {
@@ -83,9 +85,17 @@ export interface Note {
   versions?: { date: number; content: string }[];
 }
 
+export interface ChecklistItemConfig {
+  id: string;
+  label: string;
+  notifyTime?: string; // HH:MM
+  enabled: boolean;
+}
+
 // App Settings / Metadata
 export interface AppData {
   entries: Record<string, DailyEntry>;
   principles: Note[]; 
   essays: Note[];
+  checklistConfig: ChecklistItemConfig[]; // New: Template for habits
 }

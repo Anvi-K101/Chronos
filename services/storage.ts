@@ -1,27 +1,35 @@
-import { DailyEntry, AppData } from '../types';
+
+import { DailyEntry, AppData, ChecklistItemConfig } from '../types';
 import { EMPTY_ENTRY } from '../constants';
 import { db } from './firebase';
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 const STORAGE_KEY = 'chronos_data_v1';
 
-// Helpers to flatten/unflatten data if needed, but we keep it simple for now
+const DEFAULT_CHECKLIST: ChecklistItemConfig[] = [
+  { id: 'journal', label: 'Write in Journal', enabled: true },
+  { id: 'move', label: 'Physical Movement', enabled: true },
+  { id: 'read', label: 'Read (15m)', enabled: true },
+];
+
 export const StorageService = {
-  // Load entire dataset (Legacy/Offline)
   loadLocal: (): AppData => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) {
-        return { entries: {}, principles: [], essays: [] };
+        return { entries: {}, principles: [], essays: [], checklistConfig: DEFAULT_CHECKLIST };
       }
-      return JSON.parse(raw);
+      const data = JSON.parse(raw);
+      if (!data.checklistConfig) {
+        data.checklistConfig = DEFAULT_CHECKLIST;
+      }
+      return data;
     } catch (e) {
       console.error("Failed to load local data", e);
-      return { entries: {}, principles: [], essays: [] };
+      return { entries: {}, principles: [], essays: [], checklistConfig: DEFAULT_CHECKLIST };
     }
   },
 
-  // Save entire dataset (Legacy/Offline)
   saveLocal: (data: AppData) => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -30,7 +38,17 @@ export const StorageService = {
     }
   },
 
-  // Get a single entry (Smart Hybrid)
+  getChecklistConfig: (): ChecklistItemConfig[] => {
+    const data = StorageService.loadLocal();
+    return data.checklistConfig || DEFAULT_CHECKLIST;
+  },
+
+  saveChecklistConfig: (config: ChecklistItemConfig[]) => {
+    const data = StorageService.loadLocal();
+    data.checklistConfig = config;
+    StorageService.saveLocal(data);
+  },
+
   getEntry: async (dateStr: string, userId?: string): Promise<DailyEntry> => {
     // 1. If user is logged in, try to fetch from Cloud
     if (userId && db) {
@@ -38,38 +56,55 @@ export const StorageService = {
         const docRef = doc(db, 'users', userId, 'entries', dateStr);
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
-          return docSnap.data() as DailyEntry;
+          const remoteData = docSnap.data() as DailyEntry;
+          if (!remoteData.checklist) remoteData.checklist = {};
+          if (!remoteData.state) remoteData.state = { ...EMPTY_ENTRY.state };
+          if (!remoteData.effort) remoteData.effort = { ...EMPTY_ENTRY.effort };
+          
+          const localData = StorageService.loadLocal();
+          localData.entries[dateStr] = remoteData;
+          StorageService.saveLocal(localData);
+          
+          return remoteData;
         }
-      } catch (e) {
-        console.warn("Offline or FireStore error, falling back to local cache", e);
+      } catch (e: any) {
+        if (e.code === 'permission-denied') {
+          console.error("Chronos: Critical Permission Error. Check Auth/Rules binding.", e);
+        } else {
+          console.warn("Chronos: Cloud fetch failed, using local cache", e);
+        }
       }
     }
 
-    // 2. Fallback to LocalStorage
     const data = StorageService.loadLocal();
     if (data.entries[dateStr]) {
-      return data.entries[dateStr];
+      const localEntry = data.entries[dateStr];
+      if (!localEntry.checklist) localEntry.checklist = {};
+      return localEntry;
     }
     
-    // 3. Return Empty if new
     return { ...EMPTY_ENTRY, id: dateStr };
   },
 
-  // Save a single entry (Smart Hybrid)
   saveEntry: async (entry: DailyEntry, userId?: string) => {
-    // 1. Always save to LocalStorage for immediate UI feedback (Optimistic)
     const data = StorageService.loadLocal();
     data.entries[entry.id] = entry;
     StorageService.saveLocal(data);
 
-    // 2. If logged in, sync to Cloud in background
     if (userId && db) {
       try {
         const docRef = doc(db, 'users', userId, 'entries', entry.id);
-        await setDoc(docRef, entry, { merge: true });
-      } catch (e) {
-        console.error("Cloud sync failed", e);
-        // Add to a "pending sync" queue in real app
+        await setDoc(docRef, { 
+          ...entry, 
+          userId, // Explicitly tag with userId for security rules
+          timestamp: Date.now() 
+        }, { merge: true });
+      } catch (e: any) {
+        if (e.code === 'permission-denied') {
+          console.error("Chronos: Sync Blocked. Permission Insufficient.", e);
+        } else {
+          console.error("Chronos: Cloud sync failed", e);
+        }
       }
     }
   },

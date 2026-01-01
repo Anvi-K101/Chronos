@@ -1,33 +1,23 @@
+
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
-// ------------------------------------------------------------------
-// INSTRUCTION: Replace this object with your Firebase Project Config
-// ------------------------------------------------------------------
+// Provided Firebase Project Config
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "your-project.firebaseapp.com",
-  projectId: "your-project-id",
-  storageBucket: "your-project.appspot.com",
-  messagingSenderId: "00000000000",
-  appId: "1:00000000000:web:00000000000000"
+  apiKey: "AIzaSyCkQSl2XJWKlrpU4PWDqqazqwO1nRHfLI4",
+  authDomain: "the-tree-7a6b1.firebaseapp.com",
+  projectId: "the-tree-7a6b1",
+  storageBucket: "the-tree-7a6b1.firebasestorage.app",
+  messagingSenderId: "652498284468",
+  appId: "1:652498284468:web:239db769174200f3834ce1",
+  measurementId: "G-M4M772475F"
 };
 
-let app, auth, db;
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
 
-try {
-  // Only initialize if config is real (basic check)
-  if (firebaseConfig.apiKey !== "YOUR_API_KEY") {
-    app = initializeApp(firebaseConfig);
-    auth = getAuth(app);
-    db = getFirestore(app);
-    console.log("Chronos: Firebase Initialized");
-  } else {
-    console.warn("Chronos: Firebase config missing. Running in Local Offline Mode.");
-  }
-} catch (e) {
-  console.error("Chronos: Firebase Init Error", e);
-}
+console.log("Chronos: Firebase Initialized");
 
 export { auth, db };

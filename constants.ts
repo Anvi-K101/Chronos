@@ -1,3 +1,4 @@
+
 import { DailyEntry } from './types';
 
 export const MOOD_LABELS = {
@@ -65,5 +66,6 @@ export const EMPTY_ENTRY: DailyEntry = {
     visionBoardText: '',
     lookingForward: '',
     wishes: ''
-  }
+  },
+  checklist: {}
 };

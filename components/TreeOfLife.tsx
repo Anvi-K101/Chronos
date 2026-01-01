@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef } from 'react';
 import * as d3 from 'd3';
 
@@ -9,13 +10,14 @@ interface TreeOfLifeProps {
     totalCreative: number;
     totalStress: number;
     totalClarity: number;
+    checklistComplete: number; // New prop
   }
 }
 
 export const TreeOfLife: React.FC<TreeOfLifeProps> = ({ 
   entryCount, 
   activityLevel, 
-  stats = { avgMood: 5, totalCreative: 0, totalStress: 0, totalClarity: 0 } 
+  stats = { avgMood: 5, totalCreative: 0, totalStress: 0, totalClarity: 0, checklistComplete: 0 } 
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
 
@@ -89,6 +91,17 @@ export const TreeOfLife: React.FC<TreeOfLifeProps> = ({
            endOfBranch.append("circle")
               .attr("r", branchWidth * 1.5)
               .attr("fill", "#44403c");
+        }
+        
+        // Checklist Fruits/Flowers
+        // Logic: if total completed checklist items > specific threshold, draw fruits
+        // We simulate this by random chance based on stats.checklistComplete
+        const fruitChance = Math.min(stats.checklistComplete / 100, 0.4); // Max 40% chance per branch end
+        if (depth === 1 && Math.random() < fruitChance) {
+             endOfBranch.append("circle")
+                .attr("r", 3 + Math.random() * 2)
+                .attr("fill", "#fb923c") // Orange fruit
+                .attr("opacity", 0.9);
         }
 
         const branchCount = Math.random() > 0.35 ? 2 : 3;
