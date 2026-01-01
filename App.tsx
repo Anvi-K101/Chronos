@@ -1,0 +1,78 @@
+import React from 'react';
+import { HashRouter as Router, Routes, Route } from 'react-router-dom';
+import { Home } from './views/Home';
+import { BottomNav } from './components/Navigation';
+import { Analytics } from './views/Analytics';
+import { AuthProvider } from './services/authContext';
+import { 
+  StatePage, EffortPage, AchievementsPage, 
+  ReflectionsPage, MemoriesPage, FuturePage 
+} from './views/CategoryPages';
+import { StorageService } from './services/storage';
+
+// Re-implementing ArchiveView here briefly to ensure it works with new layout if not moved
+const Archive = () => {
+  const [entries, setEntries] = React.useState<any[]>([]);
+
+  React.useEffect(() => {
+    const data = StorageService.loadLocal();
+    const sorted = Object.values(data.entries).sort((a: any, b: any) => b.id.localeCompare(a.id));
+    setEntries(sorted);
+  }, []);
+
+  return (
+    <div className="min-h-screen bg-paper pb-32 pt-24 px-6 max-w-3xl mx-auto">
+      <h1 className="font-serif text-3xl text-ink font-bold mb-8">Timeline 2026</h1>
+      <div className="space-y-8 border-l border-gray-200 ml-3 pl-8 pb-12">
+        {entries.map((entry) => (
+          <div key={entry.id} className="relative group">
+             <div className="absolute -left-[37px] top-2 w-3 h-3 rounded-full bg-white border-2 border-gray-300 group-hover:border-organic-500 transition-colors" />
+             <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-all">
+                <div className="flex justify-between items-baseline mb-2">
+                   <h3 className="font-serif text-xl font-bold text-ink">
+                      {new Date(entry.id).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}
+                   </h3>
+                   {entry.state.mood && <span className="font-sans text-xs font-bold text-gray-400">Mood: {entry.state.mood}</span>}
+                </div>
+                {entry.achievements.dailyWins && <p className="font-serif text-gray-600 italic mb-3">"{entry.achievements.dailyWins}"</p>}
+                <div className="flex flex-wrap gap-2">
+                   {entry.state.descriptors.map((d: string) => (
+                     <span key={d} className="text-[10px] uppercase font-bold text-stone-500 bg-stone-50 px-2 py-1 rounded">{d}</span>
+                   ))}
+                </div>
+             </div>
+          </div>
+        ))}
+        {entries.length === 0 && <p className="text-gray-400 italic">No history yet.</p>}
+      </div>
+    </div>
+  );
+};
+
+function App() {
+  return (
+    <AuthProvider>
+      <Router>
+        <div className="bg-paper min-h-screen font-sans selection:bg-organic-200 selection:text-organic-900">
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/analytics" element={<Analytics />} />
+            
+            {/* Logging Categories */}
+            <Route path="/log/state" element={<StatePage />} />
+            <Route path="/log/effort" element={<EffortPage />} />
+            <Route path="/log/achievements" element={<AchievementsPage />} />
+            <Route path="/log/reflections" element={<ReflectionsPage />} />
+            <Route path="/log/memories" element={<MemoriesPage />} />
+            <Route path="/log/future" element={<FuturePage />} />
+            
+            <Route path="/archive" element={<Archive />} />
+          </Routes>
+          <BottomNav />
+        </div>
+      </Router>
+    </AuthProvider>
+  );
+}
+
+export default App;
