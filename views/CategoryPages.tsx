@@ -1,12 +1,12 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { DailyEntry, RatingScale } from '../types';
+import { DailyEntry, RatingScale as RatingType } from '../types';
 import { COMMON_EMOTIONS, EMPTY_ENTRY } from '../constants';
 import { StorageService } from '../services/storage';
 import { useAuth } from '../services/authContext';
 import { 
-  PageContainer, SectionHeader, Card, MoodPicker, 
-  Counter, SliderInput, TextInput, 
+  PageContainer, SectionHeader, Card, MoodLevelSelector, 
+  Counter, RatingScale, TextInput, 
   SaveIndicator 
 } from '../components/ui/Controls';
 import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -34,7 +34,6 @@ const DateNavigator = ({ date, setDate }: { date: string, setDate: (d: string) =
 const useDailyEntry = (dateStr: string) => {
   const { user, loading: authLoading } = useAuth();
   
-  // 1. Initialise instantly from Local Storage (Primary Source of Truth)
   const [entry, setEntry] = useState<DailyEntry>(() => {
     const local = StorageService.loadLocal();
     return local.entries[dateStr] || { ...EMPTY_ENTRY, id: dateStr };
@@ -46,7 +45,6 @@ const useDailyEntry = (dateStr: string) => {
   const userHasEditedRef = useRef(false);
   const dateRef = useRef(dateStr);
 
-  // Sync Logic
   useEffect(() => {
     if (dateRef.current !== dateStr) {
       hydratedRef.current = false;
@@ -54,17 +52,14 @@ const useDailyEntry = (dateStr: string) => {
       dateRef.current = dateStr;
     }
     
-    // Refresh local state view immediately on date change
     const local = StorageService.loadLocal();
     const cached = local.entries[dateStr] || { ...EMPTY_ENTRY, id: dateStr };
     setEntry(cached);
 
     if (authLoading) return;
 
-    // Optional background cloud hydration
     let mounted = true;
     StorageService.getEntry(dateStr, user?.uid).then(remote => {
-      // HYDRATION POLICY: Only merge cloud data if user hasn't touched the day yet in this session
       if (mounted && !userHasEditedRef.current && !hydratedRef.current && remote) {
         setEntry(remote);
         hydratedRef.current = true;
@@ -74,26 +69,20 @@ const useDailyEntry = (dateStr: string) => {
     return () => { mounted = false; };
   }, [dateStr, user, authLoading]);
 
-  // Robust, Async-Safe Save Logic
   const save = useCallback(async (updater: (prev: DailyEntry) => DailyEntry) => {
     userHasEditedRef.current = true;
     
     setEntry(prev => {
       const next = updater(prev);
-      
-      // SIDE EFFECT: Background persistence
       setSaveStatus('saving');
       
       StorageService.saveEntry(next, user?.uid)
         .then(() => {
-          // Cloud success
           setSaveStatus('saved');
           setTimeout(() => setSaveStatus('idle'), 2000);
         })
         .catch(() => {
-          // Cloud failed or offline, but data is safe in local storage via StorageService
-          setSaveStatus('local');
-          setTimeout(() => setSaveStatus('idle'), 3000);
+          setSaveStatus('idle'); // Local backup is always written by service
         });
         
       return next;
@@ -119,10 +108,10 @@ const PageWrapper = ({ Component, title, subtitle }: { Component: any, title: st
 
 const StateContent = ({ entry, save }: { entry: DailyEntry, save: any }) => (
   <>
-      <Card title="Mood">
-        <MoodPicker value={entry.state.mood} onChange={(v) => save((p: DailyEntry) => ({...p, state: {...p.state, mood: v as RatingScale}}))} />
+      <Card title="Mood Essence">
+        <MoodLevelSelector value={entry.state.mood} onChange={(v) => save((p: DailyEntry) => ({...p, state: {...p.state, mood: v as RatingType}}))} />
       </Card>
-      <Card title="Emotions">
+      <Card title="Detailed Emotions">
          <div className="flex flex-wrap gap-2">
             {COMMON_EMOTIONS.map(emo => {
               const isActive = entry.state.descriptors.includes(emo);
@@ -144,13 +133,15 @@ const StateContent = ({ entry, save }: { entry: DailyEntry, save: any }) => (
             })}
          </div>
       </Card>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card>
-          <SliderInput label="Stress" value={entry.state.stress} onChange={(v) => save((p: DailyEntry) => ({...p, state: {...p.state, stress: v as RatingScale}}))} />
-          <SliderInput label="Clarity" value={entry.state.mentalClarity} onChange={(v) => save((p: DailyEntry) => ({...p, state: {...p.state, mentalClarity: v as RatingScale}}))} />
-          <SliderInput label="Anxiety" value={entry.state.anxiety} onChange={(v) => save((p: DailyEntry) => ({...p, state: {...p.state, anxiety: v as RatingScale}}))} />
+      <div className="grid grid-cols-1 gap-6">
+        <Card title="Internal Metrics">
+          <div className="space-y-8">
+            <RatingScale label="Stress" value={entry.state.stress} onChange={(v) => save((p: DailyEntry) => ({...p, state: {...p.state, stress: v as RatingType}}))} />
+            <RatingScale label="Clarity" value={entry.state.mentalClarity} onChange={(v) => save((p: DailyEntry) => ({...p, state: {...p.state, mentalClarity: v as RatingType}}))} />
+            <RatingScale label="Anxiety" value={entry.state.anxiety} onChange={(v) => save((p: DailyEntry) => ({...p, state: {...p.state, anxiety: v as RatingType}}))} />
+          </div>
         </Card>
-        <Card>
+        <Card title="Reactions">
            <Counter label="Times Cried" value={entry.state.timesCried} onChange={(v) => save((p: DailyEntry) => ({...p, state: {...p.state, timesCried: v}}))} />
            <Counter label="Times Laughed" value={entry.state.timesLaughed} onChange={(v) => save((p: DailyEntry) => ({...p, state: {...p.state, timesLaughed: v}}))} />
         </Card>
@@ -164,13 +155,15 @@ const EffortContent = ({ entry, save }: { entry: DailyEntry, save: any }) => (
         <Card title="Focus Volume">
           <Counter label="Work Hours" value={entry.effort.workHours} onChange={(v) => save((p: DailyEntry) => ({...p, effort: {...p.effort, workHours: v}}))} />
           <Counter label="Creative Hours" value={entry.effort.creativeHours} onChange={(v) => save((p: DailyEntry) => ({...p, effort: {...p.effort, creativeHours: v}}))} />
-          <div className="mt-4 pt-4 border-t border-gray-100">
-             <SliderInput label="Focus Quality" value={entry.effort.focusQuality} onChange={(v) => save((p: DailyEntry) => ({...p, effort: {...p.effort, focusQuality: v as RatingScale}}))} />
+          <div className="mt-8 pt-8 border-t border-gray-100">
+             <RatingScale label="Focus Quality" value={entry.effort.focusQuality} onChange={(v) => save((p: DailyEntry) => ({...p, effort: {...p.effort, focusQuality: v as RatingType}}))} />
           </div>
         </Card>
         <Card title="Recovery">
           <Counter label="Sleep Hours" value={entry.effort.sleepDuration} onChange={(v) => save((p: DailyEntry) => ({...p, effort: {...p.effort, sleepDuration: v}}))} />
-          <SliderInput label="Sleep Quality" value={entry.effort.sleepQuality} onChange={(v) => save((p: DailyEntry) => ({...p, effort: {...p.effort, sleepQuality: v as RatingScale}}))} />
+          <div className="mt-8 pt-8 border-t border-gray-100">
+            <RatingScale label="Sleep Quality" value={entry.effort.sleepQuality} onChange={(v) => save((p: DailyEntry) => ({...p, effort: {...p.effort, sleepQuality: v as RatingType}}))} />
+          </div>
         </Card>
       </div>
     </>

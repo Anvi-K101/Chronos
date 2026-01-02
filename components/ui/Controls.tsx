@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Minus, Check } from 'lucide-react';
+import { Plus, Minus, Check, Cloud, CloudCheck, RefreshCw } from 'lucide-react';
 
 export const PageContainer: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
   <div className={`min-h-screen pb-32 pt-24 px-6 md:px-12 max-w-3xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 ${className}`}>
@@ -31,98 +32,99 @@ export const Card: React.FC<{
   </div>
 );
 
-export const MoodPicker: React.FC<{ value: number | null, onChange: (val: number) => void }> = ({ value, onChange }) => {
-  const [internal, setInternal] = useState<number>(() => value || 5);
-  const lastInteractionRef = useRef<number>(0);
+// --- NEW REPLACEMENTS FOR SLIDERS ---
 
-  useEffect(() => {
-    const isInteracting = Date.now() - lastInteractionRef.current < 2000;
-    if (typeof value === 'number' && !isInteracting) {
-      setInternal(value);
-    }
-  }, [value]);
-
-  const handleInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    lastInteractionRef.current = Date.now();
-    setInternal(parseInt(e.target.value));
-  };
-
-  const handleCommit = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = parseInt(e.target.value);
-    lastInteractionRef.current = Date.now();
-    onChange(val);
-  };
-
-  const getLabel = (v: number) => v <= 2 ? "Despair" : v <= 4 ? "Heavy" : v <= 6 ? "Neutral" : v <= 8 ? "Light" : "Ecstatic";
+export const RatingScale: React.FC<{ 
+  value: number | null; 
+  onChange: (val: number) => void; 
+  label?: string;
+  max?: number;
+}> = ({ value, onChange, label, max = 10 }) => {
+  const [hovered, setHovered] = useState<number | null>(null);
+  const segments = Array.from({ length: max }, (_, i) => i + 1);
 
   return (
-    <div className="w-full py-4">
-      <div className="relative h-24 w-full rounded-2xl bg-stone-50 border-2 border-white shadow-pressed overflow-hidden">
-        <div className="absolute inset-y-0 left-0 bg-organic-100 opacity-30 transition-all duration-150" style={{ width: `${((internal - 1) / 9) * 100}%` }} />
-        <input
-          type="range" min="1" max="10" step="1"
-          value={internal}
-          onInput={handleInput}
-          onChange={handleCommit}
-          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
-        />
-        <div className="absolute inset-0 flex items-center justify-between px-10 pointer-events-none z-10">
-           <div className="flex flex-col">
-             <span className="text-[10px] uppercase font-bold tracking-widest text-gray-400">Current Mood</span>
-             <span className="font-serif font-black text-2xl text-ink/80 uppercase">{getLabel(internal)}</span>
-           </div>
-           <span className="font-serif font-black text-5xl text-organic-600">{internal}</span>
+    <div className="mb-8 last:mb-0">
+      {label && (
+        <div className="flex justify-between mb-3 items-center">
+          <label className="font-serif text-ink/70 text-sm font-bold uppercase tracking-wider">{label}</label>
+          <span className="font-mono text-lg font-bold text-organic-700 bg-organic-50 px-3 py-1 rounded-lg border border-organic-100">
+            {value || '-'}
+          </span>
         </div>
+      )}
+      <div className="grid grid-cols-5 md:grid-cols-10 gap-2">
+        {segments.map((num) => {
+          const isActive = value !== null && num <= value;
+          const isCurrent = value === num;
+          return (
+            <button
+              key={num}
+              type="button"
+              onMouseEnter={() => setHovered(num)}
+              onMouseLeave={() => setHovered(null)}
+              onClick={() => onChange(num)}
+              className={`
+                h-12 rounded-xl font-mono font-bold transition-all duration-150 border-2
+                ${isActive 
+                  ? 'bg-organic-600 border-organic-600 text-white shadow-md' 
+                  : 'bg-stone-50 border-stone-100 text-stone-400 hover:border-organic-300'
+                }
+                ${isCurrent ? 'scale-105 ring-2 ring-organic-200' : 'scale-100'}
+                active:scale-90
+              `}
+            >
+              {num}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
 };
 
-export const SliderInput: React.FC<{ label: string; value: number | null; onChange: (val: number) => void; min?: number; max?: number }> = ({ label, value, onChange, min = 1, max = 10 }) => {
-  const [internal, setInternal] = useState<number>(() => value || 5);
-  const lastInteractionRef = useRef<number>(0);
-
-  useEffect(() => {
-    const isInteracting = Date.now() - lastInteractionRef.current < 2000;
-    if (typeof value === 'number' && !isInteracting) {
-      setInternal(value);
-    }
-  }, [value]);
-
-  const handleInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    lastInteractionRef.current = Date.now();
-    setInternal(parseInt(e.target.value));
-  };
-
-  const handleCommit = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = parseInt(e.target.value);
-    lastInteractionRef.current = Date.now();
-    onChange(val);
-  };
-
-  const progress = ((internal - min) / (max - min)) * 100;
+export const MoodLevelSelector: React.FC<{ value: number | null, onChange: (val: number) => void }> = ({ value, onChange }) => {
+  const levels = [
+    { label: "Despair", val: 1, color: "bg-stone-800" },
+    { label: "Heavy", val: 3, color: "bg-stone-500" },
+    { label: "Neutral", val: 5, color: "bg-organic-400" },
+    { label: "Light", val: 8, color: "bg-organic-600" },
+    { label: "Ecstatic", val: 10, color: "bg-yellow-500" }
+  ];
 
   return (
-    <div className="mb-10 last:mb-0">
-      <div className="flex justify-between mb-4 items-center">
-        <label className="font-serif text-ink/70 text-base font-bold">{label}</label>
-        <span className="font-mono text-lg font-bold text-organic-700 bg-organic-50 px-3 py-1 rounded-lg border border-organic-100">{internal}</span>
-      </div>
-      <div className="relative h-12 flex items-center">
-        <div className="absolute w-full h-2.5 bg-stone-100 rounded-full border border-stone-200 overflow-hidden">
-           <div className="h-full bg-organic-500 transition-all duration-150" style={{ width: `${progress}%` }} />
-        </div>
-        <input 
-          type="range" min={min} max={max} value={internal} 
-          onInput={handleInput}
-          onChange={handleCommit}
-          className="relative w-full h-full opacity-0 cursor-pointer z-10"
-        />
-        <div className="absolute h-8 w-8 bg-white border-2 border-organic-600 rounded-full shadow-float pointer-events-none transition-all duration-150" style={{ left: `calc(${progress}% - 16px)` }} />
-      </div>
+    <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 w-full">
+      {levels.map((level) => {
+        const isSelected = value !== null && (
+          level.val === 1 ? value <= 2 :
+          level.val === 3 ? (value > 2 && value <= 4) :
+          level.val === 5 ? (value > 4 && value <= 6) :
+          level.val === 8 ? (value > 6 && value <= 8) :
+          value > 8
+        );
+        
+        return (
+          <button
+            key={level.label}
+            onClick={() => onChange(level.val)}
+            className={`
+              flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all
+              ${isSelected 
+                ? `border-ink ${level.color} text-white shadow-lg -translate-y-1` 
+                : 'border-stone-100 bg-white text-stone-500 hover:bg-stone-50'
+              }
+            `}
+          >
+            <span className="text-[10px] uppercase font-bold tracking-widest opacity-70 mb-1">{level.val}</span>
+            <span className="font-serif font-black text-sm uppercase">{level.label}</span>
+          </button>
+        );
+      })}
     </div>
   );
 };
+
+// --- END NEW COMPONENTS ---
 
 export const Counter: React.FC<{ value: number; onChange: (val: number) => void; label: string }> = ({ value, onChange, label }) => (
   <div className="flex items-center justify-between py-3 border-b border-dashed border-organic-100 last:border-0">
@@ -159,17 +161,20 @@ export const CheckItem: React.FC<{ label: string; checked: boolean; onToggle: ()
 
 export const SaveIndicator: React.FC<{ status: 'saved' | 'saving' | 'idle' | 'local' }> = ({ status }) => {
   if (status === 'idle') return null;
-  const label = {
-    saving: 'Vault Syncing...',
-    saved: 'Cloud Secured',
-    local: 'Stored Locally'
-  }[status as string] || 'Active';
+  
+  const isSaving = status === 'saving';
+  const label = isSaving ? 'Syncing Vault...' : 'Cloud Secured';
 
   return (
     <div className="fixed top-6 right-6 z-[60] pointer-events-none animate-in fade-in slide-in-from-top-2">
-      <div className="bg-white/95 backdrop-blur-md px-4 py-2 rounded-full shadow-float border border-organic-100 flex items-center gap-3">
-         <div className={`w-2 h-2 rounded-full ${status === 'saving' ? 'bg-orange-400 animate-pulse' : status === 'local' ? 'bg-stone-400' : 'bg-organic-600'}`} />
-         <span className="text-xs font-bold uppercase tracking-widest text-gray-500">{label}</span>
+      <div className={`
+        bg-white/95 backdrop-blur-md px-4 py-2 rounded-full shadow-float border flex items-center gap-3 transition-colors
+        ${isSaving ? 'border-orange-100' : 'border-organic-100'}
+      `}>
+         {isSaving ? <RefreshCw size={14} className="text-orange-500 animate-spin" /> : <CloudCheck size={14} className="text-organic-600" />}
+         <span className={`text-[10px] font-bold uppercase tracking-widest ${isSaving ? 'text-orange-600' : 'text-organic-600'}`}>
+          {label}
+         </span>
       </div>
     </div>
   );

@@ -1,9 +1,9 @@
+
 import React, { useState, useCallback, useEffect } from 'react';
 import { DailyEntry } from '../types';
 import { COMMON_EMOTIONS, MOOD_LABELS, EMPTY_ENTRY } from '../constants';
 import { StorageService } from '../services/storage';
-// Fix: Changed 'Tile' to 'Card' as 'Tile' is not exported from Controls
-import { Card, MoodPicker, Stepper, ChipGroup, MinimalInput, SaveIndicator } from '../components/ui/Controls';
+import { Card, MoodLevelSelector, Stepper, ChipGroup, MinimalInput, SaveIndicator, RatingScale } from '../components/ui/Controls';
 import { Sun, Moon, Coffee, Book, Heart, Feather, Briefcase, Zap, ArrowRight, X } from 'lucide-react';
 import { useAuth } from '../services/authContext';
 
@@ -11,7 +11,6 @@ interface DailyLoggerProps {
   date: string;
 }
 
-// --- Icons mapped to concepts ---
 const Icons = {
   Morning: Sun,
   Evening: Moon,
@@ -39,24 +38,24 @@ export const DailyLogger: React.FC<DailyLoggerProps> = ({ date }) => {
     return () => { mounted = false; };
   }, [date, user]);
 
-  // Time of Day Logic for greetings/sorting
   const hour = new Date().getHours();
   const timeContext = hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'evening';
   const greeting = timeContext === 'morning' ? "The day awaits." : timeContext === 'afternoon' ? "In the flow." : "Rest and reflect.";
 
-  // Auto-save logic
   const updateEntry = useCallback((updater: (prev: DailyEntry) => DailyEntry) => {
     setEntry(prev => {
       const next = updater(prev);
       setSaveStatus('saving');
-      StorageService.saveEntry(next, user?.uid);
-      setTimeout(() => setSaveStatus('saved'), 600);
-      setTimeout(() => setSaveStatus('idle'), 2500);
+      StorageService.saveEntry(next, user?.uid).then(() => {
+          setSaveStatus('saved');
+          setTimeout(() => setSaveStatus('idle'), 2000);
+      }).catch(() => {
+          setSaveStatus('idle'); // Silent fail/retry handled by service
+      });
       return next;
     });
   }, [user]);
 
-  // Helpers
   const updateState = (key: keyof DailyEntry['state'], val: any) => 
     updateEntry(prev => ({ ...prev, state: { ...prev.state, [key]: val } }));
   
@@ -76,7 +75,6 @@ export const DailyLogger: React.FC<DailyLoggerProps> = ({ date }) => {
     <div className="min-h-screen pb-32 px-4 md:px-8 max-w-4xl mx-auto pt-6">
       <SaveIndicator status={saveStatus} />
 
-      {/* Header Section */}
       <header className="mb-8 mt-2">
         <h1 className="font-serif text-3xl md:text-4xl text-ink font-bold mb-1">
           {new Date(date).toLocaleDateString('en-US', { weekday: 'long', day: 'numeric' })}
@@ -84,18 +82,15 @@ export const DailyLogger: React.FC<DailyLoggerProps> = ({ date }) => {
         <p className="font-sans text-sm font-medium text-gray-400 uppercase tracking-widest">{greeting}</p>
       </header>
 
-      {/* COMMAND SURFACE: GRID LAYOUT */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-4">
 
-        {/* 1. MOOD & ESSENCE (Full Width on Mobile, 6 cols on Desktop) */}
-        {/* Fix: Changed 'Tile' to 'Card' */}
         <Card className="col-span-1 lg:col-span-6 flex flex-col justify-center min-h-[160px]">
-          <h3 className="font-serif text-sm font-bold text-gray-400 uppercase tracking-widest mb-4">Essence</h3>
-          <MoodPicker 
+          <h3 className="font-serif text-sm font-bold text-gray-400 uppercase tracking-widest mb-6">Internal State</h3>
+          <MoodLevelSelector 
             value={entry.state.mood} 
             onChange={(v) => updateState('mood', v)} 
           />
-          <div className="mt-6">
+          <div className="mt-8">
             <MinimalInput 
               value={entry.state.descriptors.join(', ')} 
               onChange={(v) => updateState('descriptors', v.split(',').map(s => s.trim()))} 
@@ -105,10 +100,8 @@ export const DailyLogger: React.FC<DailyLoggerProps> = ({ date }) => {
           </div>
         </Card>
 
-        {/* 2. VITALITY (Sleep & Body) */}
-        {/* Fix: Changed 'Tile' to 'Card' */}
         <Card title="Vitality" className="col-span-1 lg:col-span-6 bg-stone-50/50">
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center justify-between mb-8">
              <div className="flex items-center gap-3">
                <div className="p-2 bg-white rounded-full shadow-sm text-organic-600"><Icons.Evening size={18} /></div>
                <div>
@@ -123,25 +116,17 @@ export const DailyLogger: React.FC<DailyLoggerProps> = ({ date }) => {
                 max={16}
              />
           </div>
-           <div className="flex items-center justify-between">
-             <div className="flex items-center gap-3">
-               <div className="p-2 bg-white rounded-full shadow-sm text-orange-600"><Icons.Focus size={18} /></div>
-               <div>
-                  <div className="font-serif text-ink font-medium">Energy</div>
-                  <div className="text-xs text-gray-400 font-sans">Physical state</div>
-               </div>
-             </div>
-             <ChipGroup 
-                options={['Low', 'OK', 'High']} 
-                selected={[entry.state.physicalDiscomfort === 'Low' ? 'Low' : entry.state.physicalDiscomfort === 'High' ? 'High' : 'OK']} 
+           <div className="flex flex-col gap-4">
+              <label className="font-serif text-ink font-medium text-sm">Energy Level</label>
+              <ChipGroup 
+                options={['Low', 'Recovering', 'Stable', 'Radiant']} 
+                selected={[entry.state.physicalDiscomfort]} 
                 onChange={(v) => updateState('physicalDiscomfort', v[0])}
                 single
-             />
+              />
           </div>
         </Card>
 
-        {/* 3. FOCUS (Work & Flow) */}
-        {/* Fix: Changed 'Tile' to 'Card' */}
         <Card title="Output" className="col-span-1 lg:col-span-4">
            <div className="space-y-6">
               <div className="flex justify-between items-center">
@@ -155,8 +140,6 @@ export const DailyLogger: React.FC<DailyLoggerProps> = ({ date }) => {
            </div>
         </Card>
 
-        {/* 4. QUICK CAPTURE (Journal) */}
-        {/* Fix: Changed 'Tile' to 'Card' */}
         <Card className="col-span-1 lg:col-span-8 bg-organic-50/30 border-organic-100">
            <div className="h-full flex flex-col">
              <h3 className="font-serif text-sm font-bold text-organic-700 uppercase tracking-widest mb-3 flex items-center gap-2">
@@ -178,79 +161,42 @@ export const DailyLogger: React.FC<DailyLoggerProps> = ({ date }) => {
              </div>
              <button 
                 onClick={() => setActiveOverlay('journal')}
-                className="mt-4 self-start text-xs font-bold text-organic-600 uppercase tracking-widest border-b border-organic-200 pb-0.5 hover:text-organic-800 transition-colors"
+                className="mt-6 self-start text-xs font-bold text-organic-600 uppercase tracking-widest border-b border-organic-200 pb-0.5 hover:text-organic-800 transition-colors"
              >
                Open Full Journal <ArrowRight size={10} className="inline ml-1"/>
              </button>
            </div>
         </Card>
 
-        {/* 5. MIND (Stress & Clarity) - Compact */}
-        {/* Fix: Changed 'Tile' to 'Card' */}
-        <Card className="col-span-1 lg:col-span-6 flex flex-col justify-between">
-           <div className="mb-4">
-              <div className="flex justify-between text-sm font-serif mb-2 text-gray-500">
-                <span>Anxiety</span>
-                <span className="text-ink font-bold">{entry.state.anxiety || '-'}/10</span>
-              </div>
-              <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-stone-400 transition-all duration-300" 
-                  style={{ width: `${(entry.state.anxiety || 0) * 10}%` }}
-                />
-              </div>
-              <input 
-                type="range" min="1" max="10" 
-                value={entry.state.anxiety || 1} 
-                onChange={(e) => updateState('anxiety', parseInt(e.target.value))}
-                className="w-full h-6 -mt-4 opacity-0 cursor-pointer relative z-10"
-              />
-           </div>
-           
-           <div>
-              <div className="flex justify-between text-sm font-serif mb-2 text-gray-500">
-                <span>Clarity</span>
-                <span className="text-ink font-bold">{entry.state.mentalClarity || '-'}/10</span>
-              </div>
-              <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-organic-400 transition-all duration-300" 
-                  style={{ width: `${(entry.state.mentalClarity || 0) * 10}%` }}
-                />
-              </div>
-              <input 
-                type="range" min="1" max="10" 
-                value={entry.state.mentalClarity || 1} 
-                onChange={(e) => updateState('mentalClarity', parseInt(e.target.value))}
-                className="w-full h-6 -mt-4 opacity-0 cursor-pointer relative z-10"
-              />
+        <Card className="col-span-1 lg:col-span-12">
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+              <RatingScale label="Anxiety" value={entry.state.anxiety} onChange={(v) => updateState('anxiety', v)} />
+              <RatingScale label="Mental Clarity" value={entry.state.mentalClarity} onChange={(v) => updateState('mentalClarity', v)} />
            </div>
         </Card>
 
-        {/* 6. MEMORY & PEOPLE */}
-        {/* Fix: Changed 'Tile' to 'Card' */}
-        <Card className="col-span-1 lg:col-span-6 bg-white">
-           <h3 className="font-serif text-sm font-bold text-gray-400 uppercase tracking-widest mb-3">Connections</h3>
-           <MinimalInput 
-              value={entry.memory.peopleMet}
-              onChange={(v) => updateEntry(p => ({...p, memory: {...p.memory, peopleMet: v}}))}
-              placeholder="Who did you see today?"
-              multiline
-              className="text-base text-gray-700"
-           />
-           <div className="my-3 border-t border-gray-100 w-1/3" />
-           <MinimalInput 
-              value={entry.memory.conversations}
-              onChange={(v) => updateEntry(p => ({...p, memory: {...p.memory, conversations: v}}))}
-              placeholder="Conversations that mattered..."
-              multiline
-              className="text-base text-gray-700"
-           />
+        <Card className="col-span-1 lg:col-span-12 bg-white">
+           <h3 className="font-serif text-sm font-bold text-gray-400 uppercase tracking-widest mb-3">Connections & Memories</h3>
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <MinimalInput 
+                value={entry.memory.peopleMet}
+                onChange={(v) => updateEntry(p => ({...p, memory: {...p.memory, peopleMet: v}}))}
+                placeholder="Who did you see today?"
+                multiline
+                className="text-base text-gray-700"
+              />
+              <MinimalInput 
+                value={entry.memory.conversations}
+                onChange={(v) => updateEntry(p => ({...p, memory: {...p.memory, conversations: v}}))}
+                placeholder="Conversations that mattered..."
+                multiline
+                className="text-base text-gray-700"
+              />
+           </div>
         </Card>
 
       </div>
 
-      {/* FULL JOURNAL OVERLAY */}
       {activeOverlay === 'journal' && (
         <div className="fixed inset-0 z-50 bg-paper/95 backdrop-blur-md overflow-y-auto animate-in fade-in duration-200">
            <div className="max-w-3xl mx-auto p-6 pt-12 min-h-screen flex flex-col">
