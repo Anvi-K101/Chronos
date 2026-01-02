@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
 import { DailyEntry, RatingScale } from '../types';
-import { COMMON_EMOTIONS } from '../constants';
+import { COMMON_EMOTIONS, EMPTY_ENTRY } from '../constants';
 import { StorageService } from '../services/storage';
 import { useAuth } from '../services/authContext';
 import { 
@@ -8,8 +9,7 @@ import {
   Counter, SliderInput, TextInput, CheckItem,
   SaveIndicator 
 } from '../components/ui/Controls';
-import { Check, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Check, Calendar, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
 
 // --- Shared Date Navigator ---
 const DateNavigator = ({ date, setDate }: { date: string, setDate: (d: string) => void }) => {
@@ -33,40 +33,68 @@ const DateNavigator = ({ date, setDate }: { date: string, setDate: (d: string) =
   );
 };
 
-// Shared Logic Hook with Async Support
+// Shared Logic Hook with Non-Blocking Initialization
 const useDailyEntry = (dateStr: string) => {
-  const { user } = useAuth();
-  const [entry, setEntry] = useState<DailyEntry | null>(null);
+  const { user, loading: authLoading } = useAuth();
+  const [entry, setEntry] = useState<DailyEntry>({ ...EMPTY_ENTRY, id: dateStr });
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'idle'>('idle');
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
+    // We render immediately with EMPTY_ENTRY, then hydrate when data arrives
     let mounted = true;
-    StorageService.getEntry(dateStr, user?.uid).then(data => {
-      if (mounted) setEntry(data);
-    });
+    const currentUid = user?.uid;
+
+    const fetchData = async () => {
+      try {
+        const data = await StorageService.getEntry(dateStr, currentUid);
+        if (mounted) {
+           setEntry(data);
+           setLoadError(null);
+        }
+      } catch (err: any) {
+        if (mounted) {
+          console.warn("Chronos: Async load issue, remaining on local baseline.");
+        }
+      }
+    };
+
+    fetchData();
     return () => { mounted = false; };
-  }, [dateStr, user]);
+  }, [dateStr, user, authLoading]);
 
   const save = (updater: (prev: DailyEntry) => DailyEntry) => {
-    if (!entry) return;
     const next = updater(entry);
-    setEntry(next); // Optimistic
+    setEntry(next); // Immediate UI update
     setSaveStatus('saving');
+    
     StorageService.saveEntry(next, user?.uid).then(() => {
        setSaveStatus('saved');
-       setTimeout(() => setSaveStatus('idle'), 2000);
+       setTimeout(() => setSaveStatus('idle'), 1500);
+    }).catch(err => {
+      setSaveStatus('idle');
+      console.error("Chronos: Save bypassed", err.message);
     });
   };
 
-  return { entry, save, saveStatus };
+  return { entry, save, saveStatus, loadError };
 };
 
-// Wrapper for all Pages to handle Date State
+// Wrapper for all Pages
 const PageWrapper = ({ Component, title, subtitle }: { Component: any, title: string, subtitle: string }) => {
    const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-   const { entry, save, saveStatus } = useDailyEntry(date);
+   const { entry, save, saveStatus, loadError } = useDailyEntry(date);
 
-   if (!entry) return <div className="min-h-screen pt-24 text-center text-gray-400">Loading timeline...</div>;
+   if (loadError) return (
+      <PageContainer>
+        <div className="min-h-[60vh] flex flex-col items-center justify-center text-center p-8">
+           <AlertTriangle size={48} className="text-red-400 mb-6" />
+           <h2 className="font-serif text-2xl font-bold text-ink mb-2">Vault Sync Interrupted</h2>
+           <p className="text-gray-500 italic mb-8 max-w-sm">Unable to confirm cloud permissions. Data will remain in local storage.</p>
+           <button onClick={() => window.location.reload()} className="px-6 py-3 bg-ink text-white rounded-full font-bold uppercase tracking-widest text-xs">Retry Vault Connection</button>
+        </div>
+      </PageContainer>
+   );
 
    return (
      <PageContainer>
@@ -101,7 +129,7 @@ const StateContent = ({ entry, save }: { entry: DailyEntry, save: any }) => (
                     }
                   }))}
                   className={`px-4 py-2 rounded-full text-sm font-sans font-medium transition-all ${
-                    isActive ? 'bg-organic-600 text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                    isActive ? 'bg-organic-600 text-white shadow-sm' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
                   }`}
                 >
                   {emo}
@@ -113,7 +141,7 @@ const StateContent = ({ entry, save }: { entry: DailyEntry, save: any }) => (
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
           <SliderInput label="Stress" value={entry.state.stress} onChange={(v) => save((p: DailyEntry) => ({...p, state: {...p.state, stress: v as RatingScale}}))} />
-          <SliderInput label="Mental Clarity" value={entry.state.mentalClarity} onChange={(v) => save((p: DailyEntry) => ({...p, state: {...p.state, mentalClarity: v as RatingScale}}))} />
+          <SliderInput label="Clarity" value={entry.state.mentalClarity} onChange={(v) => save((p: DailyEntry) => ({...p, state: {...p.state, mentalClarity: v as RatingScale}}))} />
           <SliderInput label="Anxiety" value={entry.state.anxiety} onChange={(v) => save((p: DailyEntry) => ({...p, state: {...p.state, anxiety: v as RatingScale}}))} />
         </Card>
         <Card>
@@ -121,11 +149,11 @@ const StateContent = ({ entry, save }: { entry: DailyEntry, save: any }) => (
            <Counter label="Times Laughed" value={entry.state.timesLaughed} onChange={(v) => save((p: DailyEntry) => ({...p, state: {...p.state, timesLaughed: v}}))} />
         </Card>
       </div>
-      <Card title="Physical Body">
+      <Card title="Body Notes">
         <TextInput 
           value={entry.state.physicalDiscomfort} 
           onChange={(v) => save((p: DailyEntry) => ({...p, state: {...p.state, physicalDiscomfort: v}}))} 
-          placeholder="Pain, tension, or vitality notes..." 
+          placeholder="Physical state..." 
         />
       </Card>
   </>
@@ -135,7 +163,7 @@ const StateContent = ({ entry, save }: { entry: DailyEntry, save: any }) => (
 const EffortContent = ({ entry, save }: { entry: DailyEntry, save: any }) => (
     <>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card title="Deep Work">
+        <Card title="Focus Volume">
           <Counter label="Work Hours" value={entry.effort.workHours} onChange={(v) => save((p: DailyEntry) => ({...p, effort: {...p.effort, workHours: v}}))} />
           <Counter label="Creative Hours" value={entry.effort.creativeHours} onChange={(v) => save((p: DailyEntry) => ({...p, effort: {...p.effort, creativeHours: v}}))} />
           <div className="mt-4 pt-4 border-t border-gray-100">
@@ -143,7 +171,7 @@ const EffortContent = ({ entry, save }: { entry: DailyEntry, save: any }) => (
           </div>
         </Card>
 
-        <Card title="Rest">
+        <Card title="Recovery">
           <Counter label="Sleep Hours" value={entry.effort.sleepDuration} onChange={(v) => save((p: DailyEntry) => ({...p, effort: {...p.effort, sleepDuration: v}}))} />
           <div className="mt-4">
              <TextInput label="Wake Time" value={entry.effort.wakeTime} onChange={(v) => save((p: DailyEntry) => ({...p, effort: {...p.effort, wakeTime: v}}))} placeholder="07:00 AM" />
@@ -158,17 +186,17 @@ const EffortContent = ({ entry, save }: { entry: DailyEntry, save: any }) => (
 const AchievementsContent = ({ entry, save }: { entry: DailyEntry, save: any }) => (
     <>
       <Card>
-        <TextInput label="Daily Wins" value={entry.achievements.dailyWins} onChange={(v) => save((p: DailyEntry) => ({...p, achievements: {...p.achievements, dailyWins: v}}))} placeholder="Small or big wins..." rows={2} />
+        <TextInput label="Wins of the Day" value={entry.achievements.dailyWins} onChange={(v) => save((p: DailyEntry) => ({...p, achievements: {...p.achievements, dailyWins: v}}))} placeholder="Progress made..." rows={2} />
       </Card>
       <Card>
-        <TextInput label="Breakthroughs" value={entry.achievements.breakthroughs} onChange={(v) => save((p: DailyEntry) => ({...p, achievements: {...p.achievements, breakthroughs: v}}))} placeholder="Realizations made today..." rows={2} />
+        <TextInput label="Realizations" value={entry.achievements.breakthroughs} onChange={(v) => save((p: DailyEntry) => ({...p, achievements: {...p.achievements, breakthroughs: v}}))} placeholder="What clicked today?" rows={2} />
       </Card>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
-           <TextInput label="Failures / Rejections" value={entry.achievements.failures} onChange={(v) => save((p: DailyEntry) => ({...p, achievements: {...p.achievements, failures: v}}))} placeholder="Neutral observation..." rows={3} />
+           <TextInput label="Friction / Failures" value={entry.achievements.failures} onChange={(v) => save((p: DailyEntry) => ({...p, achievements: {...p.achievements, failures: v}}))} placeholder="Observations..." rows={3} />
         </Card>
         <Card>
-           <TextInput label="Lessons Learned" value={entry.achievements.lessons} onChange={(v) => save((p: DailyEntry) => ({...p, achievements: {...p.achievements, lessons: v}}))} placeholder="Takeaway for the future..." rows={3} />
+           <TextInput label="Key Lessons" value={entry.achievements.lessons} onChange={(v) => save((p: DailyEntry) => ({...p, achievements: {...p.achievements, lessons: v}}))} placeholder="Takeaway..." rows={3} />
         </Card>
       </div>
     </>
@@ -178,16 +206,16 @@ const AchievementsContent = ({ entry, save }: { entry: DailyEntry, save: any }) 
 const ReflectionsContent = ({ entry, save }: { entry: DailyEntry, save: any }) => (
     <>
       <Card className="min-h-[50vh]">
-        <label className="block font-serif text-lg font-bold text-gray-300 mb-4">Long Form Journal</label>
+        <label className="block font-serif text-lg font-bold text-gray-300 mb-4">Daily Journal</label>
         <textarea 
           className="w-full h-full min-h-[40vh] bg-transparent border-none p-0 text-xl font-serif text-ink leading-loose placeholder-gray-200 focus:ring-0 resize-none"
-          placeholder="Write without distraction..."
+          placeholder="Unfiltered thoughts..."
           value={entry.reflections.longForm}
           onChange={(e) => save((p: DailyEntry) => ({...p, reflections: {...p.reflections, longForm: e.target.value}}))}
         />
       </Card>
       <Card>
-        <TextInput label="What changed my mind?" value={entry.reflections.changedMind} onChange={(v) => save((p: DailyEntry) => ({...p, reflections: {...p.reflections, changedMind: v}}))} placeholder="Evolution of thought..." rows={2} />
+        <TextInput label="Refinement of Thought" value={entry.reflections.changedMind} onChange={(v) => save((p: DailyEntry) => ({...p, reflections: {...p.reflections, changedMind: v}}))} placeholder="What is evolving?" rows={2} />
       </Card>
     </>
 );
@@ -196,14 +224,15 @@ const ReflectionsContent = ({ entry, save }: { entry: DailyEntry, save: any }) =
 const MemoriesContent = ({ entry, save }: { entry: DailyEntry, save: any }) => (
     <>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-         <Card title="Moments">
+         <Card title="The Day's Texture">
             <TextInput label="Happy Moments" value={entry.memory.happyMoments} onChange={(v) => save((p: DailyEntry) => ({...p, memory: {...p.memory, happyMoments: v}}))} rows={2} />
-            <TextInput label="Meaningful / Sad" value={entry.memory.sadMoments} onChange={(v) => save((p: DailyEntry) => ({...p, memory: {...p.memory, sadMoments: v}}))} rows={2} />
+            <TextInput label="Heavier Moments" value={entry.memory.sadMoments} onChange={(v) => save((p: DailyEntry) => ({...p, memory: {...p.memory, sadMoments: v}}))} rows={2} />
          </Card>
-         <Card title="Context">
-            <TextInput label="People" value={entry.memory.peopleMet} onChange={(v) => save((p: DailyEntry) => ({...p, memory: {...p.memory, peopleMet: v}}))} />
-            <TextInput label="Places" value={entry.memory.placesVisited} onChange={(v) => save((p: DailyEntry) => ({...p, memory: {...p.memory, placesVisited: v}}))} />
-            <TextInput label="Media" value={entry.memory.media} onChange={(v) => save((p: DailyEntry) => ({...p, memory: {...p.memory, media: v}}))} placeholder="Books, Music, Art..." />
+         <Card title="Social & Surroundings">
+            <TextInput label="People Seen" value={entry.memory.peopleMet} onChange={(v) => save((p: DailyEntry) => ({...p, memory: {...p.memory, peopleMet: v}}))} />
+            <TextInput label="Places Visited" value={entry.memory.placesVisited} onChange={(v) => save((p: DailyEntry) => ({...p, memory: {...p.memory, placesVisited: v}}))} />
+            {/* Fix: Access p.memory instead of non-existent p.media */}
+            <TextInput label="Media Consumed" value={entry.memory.media} onChange={(v) => save((p: DailyEntry) => ({...p, memory: {...p.memory, media: v}}))} placeholder="Books, Music..." />
          </Card>
       </div>
       <Card>
@@ -233,7 +262,7 @@ const FutureContent = ({ entry, save }: { entry: DailyEntry, save: any }) => {
         <TextInput value={entry.future.gratitude} onChange={(v) => save((p: DailyEntry) => ({...p, future: {...p.future, gratitude: v}}))} placeholder="I am grateful for..." rows={3} />
       </Card>
 
-      <Card title="Goals for Tomorrow" action={<button onClick={addGoal} className="text-xs font-bold uppercase text-organic-600 bg-organic-50 px-3 py-1 rounded-full">Add Goal</button>}>
+      <Card title="Near-Term Intentions" action={<button onClick={addGoal} className="text-xs font-bold uppercase text-organic-600 bg-organic-50 px-3 py-1 rounded-full">Add Goal</button>}>
          <div className="space-y-3">
             {entry.future.shortTermGoals.map(goal => (
                <div key={goal.id} className="flex items-center gap-3">
@@ -248,16 +277,16 @@ const FutureContent = ({ entry, save }: { entry: DailyEntry, save: any }) => {
                   />
                </div>
             ))}
-            {entry.future.shortTermGoals.length === 0 && <p className="text-gray-400 text-sm italic">No goals set.</p>}
+            {entry.future.shortTermGoals.length === 0 && <p className="text-gray-400 text-sm italic">No goals set for tomorrow.</p>}
          </div>
       </Card>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card title="Anticipation">
-           <TextInput label="Looking Forward To" value={entry.future.lookingForward} onChange={(v) => save((p: DailyEntry) => ({...p, future: {...p.future, lookingForward: v}}))} rows={3} />
+           <TextInput label="Looking Forward" value={entry.future.lookingForward} onChange={(v) => save((p: DailyEntry) => ({...p, future: {...p.future, lookingForward: v}}))} rows={3} />
         </Card>
-        <Card title="Vision">
-           <TextInput label="Wishes & Hopes" value={entry.future.wishes} onChange={(v) => save((p: DailyEntry) => ({...p, future: {...p.future, wishes: v}}))} rows={3} />
+        <Card title="Vision Board">
+           <TextInput label="Wishes" value={entry.future.wishes} onChange={(v) => save((p: DailyEntry) => ({...p, future: {...p.future, wishes: v}}))} rows={3} />
         </Card>
       </div>
     </>
@@ -265,9 +294,9 @@ const FutureContent = ({ entry, save }: { entry: DailyEntry, save: any }) => {
 };
 
 // Exports
-export const StatePage = () => <PageWrapper Component={StateContent} title="Daily State" subtitle="Emotional & Physical Baseline" />;
-export const EffortPage = () => <PageWrapper Component={EffortContent} title="Time & Effort" subtitle="Where energy went" />;
-export const AchievementsPage = () => <PageWrapper Component={AchievementsContent} title="Achievements" subtitle="Wins, lessons, and progress" />;
-export const ReflectionsPage = () => <PageWrapper Component={ReflectionsContent} title="Reflections" subtitle="Deep thought processing" />;
-export const MemoriesPage = () => <PageWrapper Component={MemoriesContent} title="Memories" subtitle="Moments to preserve" />;
-export const FuturePage = () => <PageWrapper Component={FutureContent} title="Future & Gratitude" subtitle="Orientation" />;
+export const StatePage = () => <PageWrapper Component={StateContent} title="Vital Signs" subtitle="Daily State" />;
+export const EffortPage = () => <PageWrapper Component={EffortContent} title="Energy Allocation" subtitle="Effort & Recovery" />;
+export const AchievementsPage = () => <PageWrapper Component={AchievementsContent} title="Daily Progress" subtitle="Wins & Lessons" />;
+export const ReflectionsPage = () => <PageWrapper Component={ReflectionsContent} title="Introspection" subtitle="Daily Reflections" />;
+export const MemoriesPage = () => <PageWrapper Component={MemoriesContent} title="Archive" subtitle="Preserving Moments" />;
+export const FuturePage = () => <PageWrapper Component={FutureContent} title="Orientation" subtitle="Gratitude & Future" />;

@@ -43,48 +43,55 @@ interface MoodPickerProps {
   onChange: (val: number) => void;
 }
 
-/**
- * MoodPicker: Fixes the 'jumping/locking' bug by decoupling local interaction state
- * from global persistence. Persistence only triggers on 'change' (release).
- */
 export const MoodPicker: React.FC<MoodPickerProps> = ({ value, onChange }) => {
-  const [internalValue, setInternalValue] = useState(value || 5);
-  const isInteracting = useRef(false);
+  const [internalValue, setInternalValue] = useState<number>(value || 5);
+  const isDragging = useRef(false);
 
-  // Sync internal state only when props change and user isn't actively dragging
   useEffect(() => {
-    if (value !== null && !isInteracting.current) {
+    if (value !== null && !isDragging.current) {
       setInternalValue(value);
     }
   }, [value]);
 
+  const getLabel = (val: number) => {
+    if (val <= 2) return "Despair";
+    if (val <= 4) return "Heavy";
+    if (val <= 6) return "Neutral";
+    if (val <= 8) return "Light";
+    return "Ecstatic";
+  };
+
   const getGradientColor = (val: number) => {
-    if (val <= 3) return '#57534e'; 
-    if (val <= 7) return '#65a30d'; 
-    return '#ea580c'; 
+    if (val <= 3) return '#78716c'; // Stone-500
+    if (val <= 7) return '#65a30d'; // Organic-600
+    return '#ea580c'; // Warm orange
   };
 
   const handleInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    isInteracting.current = true;
+    isDragging.current = true;
     setInternalValue(parseInt(e.target.value));
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCommit = (e: any) => {
     const newVal = parseInt(e.target.value);
-    isInteracting.current = false;
+    setInternalValue(newVal);
     onChange(newVal);
+    // Use timeout to ensure any race conditions with re-renders are settled before allowing prop updates
+    setTimeout(() => {
+      isDragging.current = false;
+    }, 50);
   };
 
   return (
-    <div className="w-full py-4">
-      <div className="relative h-20 w-full rounded-2xl bg-stone-100 border-4 border-white shadow-soft overflow-hidden">
+    <div className="w-full py-4 group/mood">
+      <div className="relative h-24 w-full rounded-2xl bg-stone-50 border-2 border-white shadow-pressed overflow-hidden transition-all duration-500 group-hover/mood:shadow-soft">
         {/* Visual Progress Background */}
         <div 
-          className="absolute inset-y-0 left-0 bg-gradient-to-r from-stone-400 via-organic-400 to-orange-400 opacity-20 transition-all duration-300 ease-out"
+          className="absolute inset-y-0 left-0 bg-gradient-to-r from-stone-200 via-organic-200 to-orange-200 opacity-30 transition-all duration-300 ease-out"
           style={{ width: `${((internalValue - 1) / 9) * 100}%` }}
         />
         
-        {/* Native Input: High resolution touch targets */}
+        {/* Native Input: Interactions Layer */}
         <input
           type="range"
           min="1"
@@ -92,33 +99,36 @@ export const MoodPicker: React.FC<MoodPickerProps> = ({ value, onChange }) => {
           step="1"
           value={internalValue}
           onInput={handleInput}
-          onChange={handleChange}
-          onBlur={() => { isInteracting.current = false; }}
+          onChange={handleCommit}
+          onPointerDown={() => { isDragging.current = true; }}
+          onPointerUp={() => { isDragging.current = false; }}
           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20 touch-none m-0 p-0"
           style={{ touchAction: 'none' }}
         />
         
-        {/* Centered Large Display */}
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-          <div className="flex flex-col items-center">
-             <span className="font-serif font-black text-5xl leading-none transition-colors duration-300" style={{ color: getGradientColor(internalValue) }}>
+        {/* Centered Display */}
+        <div className="absolute inset-0 flex items-center justify-between px-10 pointer-events-none z-10">
+           <div className="flex flex-col items-start">
+             <span className="text-[10px] uppercase font-bold tracking-[0.3em] text-gray-400 mb-1">Current Mood</span>
+             <span className="font-serif font-black text-2xl text-ink/80 transition-all duration-300 uppercase">
+               {getLabel(internalValue)}
+             </span>
+           </div>
+           <div className="flex flex-col items-end">
+             <span className="font-serif font-black text-5xl leading-none transition-colors duration-500" style={{ color: getGradientColor(internalValue) }}>
                {internalValue}
              </span>
-             <span className="text-[10px] uppercase font-bold tracking-[0.2em] text-gray-400 -mt-1">
-               Intensity
-             </span>
-          </div>
+           </div>
         </div>
 
-        {/* Dynamic Handle Visual */}
+        {/* Dynamic Notch Visual */}
         <div 
-          className="absolute top-1 bottom-1 w-2 bg-ink/10 rounded-full transition-all duration-75 pointer-events-none"
-          style={{ left: `calc(${((internalValue - 1) / 9) * 100}% - 4px)` }}
+          className="absolute top-0 bottom-0 w-1 bg-ink/10 transition-all duration-150 pointer-events-none"
+          style={{ left: `calc(${((internalValue - 1) / 9) * 100}%)` }}
         />
       </div>
-      <div className="flex justify-between mt-3 px-2 text-[10px] font-bold text-organic-400 uppercase tracking-widest font-sans">
+      <div className="flex justify-between mt-4 px-2 text-[10px] font-bold text-gray-300 uppercase tracking-widest font-sans italic">
         <span>Despair</span>
-        <span>Neutral</span>
         <span>Ecstatic</span>
       </div>
     </div>
@@ -132,61 +142,71 @@ export const SliderInput: React.FC<{
   min?: number;
   max?: number;
 }> = ({ label, value, onChange, min = 1, max = 10 }) => {
-  const [internalValue, setInternalValue] = useState(value || Math.ceil((max - min) / 2));
-  const isInteracting = useRef(false);
+  const [internalValue, setInternalValue] = useState<number>(value || 5);
+  const isDragging = useRef(false);
 
   useEffect(() => {
-    if (value !== null && !isInteracting.current) {
+    if (value !== null && !isDragging.current) {
       setInternalValue(value);
     }
   }, [value]);
 
   const handleInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    isInteracting.current = true;
+    isDragging.current = true;
     setInternalValue(parseInt(e.target.value));
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCommit = (e: any) => {
     const newVal = parseInt(e.target.value);
-    isInteracting.current = false;
+    setInternalValue(newVal);
     onChange(newVal);
+    setTimeout(() => {
+      isDragging.current = false;
+    }, 50);
   };
 
+  const progress = ((internalValue - min) / (max - min)) * 100;
+
   return (
-    <div className="mb-8 last:mb-0">
-      <div className="flex justify-between mb-3 items-baseline">
-        <label className="font-serif text-ink/80 text-lg font-semibold">{label}</label>
-        <span className="font-bold text-organic-700 bg-organic-50 px-4 py-1.5 rounded-full text-sm border border-organic-100 shadow-sm transition-all">
-          {internalValue}
-        </span>
+    <div className="mb-10 last:mb-0 group/slider">
+      <div className="flex justify-between mb-4 items-center">
+        <label className="font-serif text-ink/70 text-base font-bold tracking-tight">{label}</label>
+        <div className="flex items-center gap-2">
+           <span className="font-mono text-lg font-bold text-organic-700 bg-organic-50 px-3 py-1 rounded-lg border border-organic-100 shadow-pressed transition-all duration-300 group-hover/slider:scale-110">
+            {internalValue}
+           </span>
+        </div>
       </div>
-      <div className="relative h-10 flex items-center">
-        {/* Track */}
-        <div className="absolute w-full h-3 bg-stone-100 rounded-full border border-stone-200 shadow-inner overflow-hidden">
+      <div className="relative h-12 flex items-center">
+        {/* Enhanced Track */}
+        <div className="absolute w-full h-2.5 bg-stone-100 rounded-full border border-stone-200 shadow-pressed overflow-hidden">
            <div 
-              className="h-full bg-organic-500 transition-all duration-300 ease-out" 
-              style={{ width: `${((internalValue - min) / (max - min)) * 100}%` }} 
+              className="h-full bg-gradient-to-r from-organic-400 to-organic-600 transition-all duration-150 ease-out shadow-sm" 
+              style={{ width: `${progress}%` }} 
            />
         </div>
         
-        {/* Native range input for interaction (invisible) */}
+        {/* Interaction Area */}
         <input 
           type="range" 
           min={min} 
           max={max} 
           value={internalValue} 
           onInput={handleInput}
-          onChange={handleChange}
-          onBlur={() => { isInteracting.current = false; }}
-          className="relative w-full h-12 opacity-0 cursor-pointer z-10 touch-none"
+          onChange={handleCommit}
+          onPointerDown={() => { isDragging.current = true; }}
+          onPointerUp={() => { isDragging.current = false; }}
+          className="relative w-full h-full opacity-0 cursor-pointer z-10 touch-none"
           style={{ touchAction: 'none' }}
         />
         
-        {/* Visual Handle */}
+        {/* Premium Handle */}
         <div 
-           className="absolute h-8 w-8 bg-white border-2 border-organic-600 rounded-full shadow-md pointer-events-none transition-all duration-75"
-           style={{ left: `calc(${((internalValue - min) / (max - min)) * 100}% - 16px)` }}
-        />
+           className="absolute h-8 w-8 bg-white border-2 border-organic-600 rounded-full shadow-float pointer-events-none transition-all duration-100 ease-out flex items-center justify-center"
+           style={{ left: `calc(${progress}% - 16px)` }}
+        >
+           <div className="w-1.5 h-1.5 bg-organic-200 rounded-full animate-pulse" />
+        </div>
       </div>
     </div>
   );

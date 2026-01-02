@@ -5,30 +5,32 @@ import { StorageService } from '../services/storage';
 import { useAuth } from '../services/authContext';
 import { PageContainer, SectionHeader, Card, SaveIndicator, CheckItem } from '../components/ui/Controls';
 import { Settings, Bell, Plus, Trash2, X, Check } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { EMPTY_ENTRY } from '../constants';
 
 export const ChecklistPage = () => {
   const { user } = useAuth();
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [entry, setEntry] = useState<DailyEntry | null>(null);
+  const [entry, setEntry] = useState<DailyEntry>({ ...EMPTY_ENTRY, id: date });
   const [config, setConfig] = useState<ChecklistItemConfig[]>([]);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'idle'>('idle');
   const [isEditing, setIsEditing] = useState(false);
   
-  // Notification Permissions
-  const [notificationsEnabled, setNotificationsEnabled] = useState(Notification.permission === 'granted');
+  const [notificationsEnabled, setNotificationsEnabled] = useState('Notification' in window && Notification.permission === 'granted');
 
   useEffect(() => {
-    // Load Config and Entry
     setConfig(StorageService.getChecklistConfig());
     
+    let mounted = true;
     StorageService.getEntry(date, user?.uid).then(data => {
-      setEntry(data);
+      if (mounted) setEntry(data);
+    }).catch(() => {
+      console.warn("Chronos: Checklist hydration bypassed.");
     });
+
+    return () => { mounted = false; };
   }, [date, user]);
 
   const toggleTask = (id: string) => {
-    if (!entry) return;
     const currentVal = entry.checklist[id] || false;
     const newVal = !currentVal;
     
@@ -40,7 +42,7 @@ export const ChecklistPage = () => {
         }
     };
 
-    setEntry(updatedEntry); // Optimistic UI
+    setEntry(updatedEntry); 
     setSaveStatus('saving');
     StorageService.saveEntry(updatedEntry, user?.uid).then(() => {
         setSaveStatus('saved');
@@ -71,23 +73,18 @@ export const ChecklistPage = () => {
   };
 
   const requestNotificationPermission = () => {
+      if (!('Notification' in window)) return;
       Notification.requestPermission().then(permission => {
           setNotificationsEnabled(permission === 'granted');
-          if (permission === 'granted') {
-              new Notification("Chronos", { body: "Daily reminders enabled." });
-          }
       });
   };
-
-  if (!entry) return <PageContainer>Loading...</PageContainer>;
 
   return (
     <PageContainer>
       <SaveIndicator status={saveStatus} />
       
-      {/* Header with Edit Toggle */}
       <div className="flex justify-between items-start mb-8">
-          <SectionHeader title="Daily Checklist" subtitle={new Date(date).toLocaleDateString()} />
+          <SectionHeader title="Habit Rituals" subtitle={new Date(date).toLocaleDateString()} />
           <button 
              onClick={() => setIsEditing(!isEditing)}
              className={`p-3 rounded-full transition-all ${isEditing ? 'bg-organic-600 text-white shadow-lg' : 'bg-white text-gray-400 hover:text-ink shadow-sm'}`}
@@ -96,10 +93,9 @@ export const ChecklistPage = () => {
           </button>
       </div>
 
-      {/* Editing Mode */}
       {isEditing && (
           <div className="animate-in slide-in-from-top-4 mb-8">
-             <Card title="Configure Habits">
+             <Card title="Manage Habits">
                 <div className="space-y-4">
                     {config.map(item => (
                         <div key={item.id} className="flex items-center gap-3">
@@ -117,15 +113,15 @@ export const ChecklistPage = () => {
                        onClick={addItem}
                        className="w-full py-3 border-2 border-dashed border-gray-200 text-gray-400 rounded-xl hover:border-organic-400 hover:text-organic-600 transition-colors flex items-center justify-center gap-2 font-bold uppercase text-xs tracking-widest"
                     >
-                        <Plus size={16} /> Add Habit
+                        <Plus size={16} /> New Habit
                     </button>
                 </div>
                 
                 <div className="mt-8 pt-6 border-t border-gray-100">
                     <div className="flex justify-between items-center">
                         <div>
-                            <h4 className="font-serif font-bold text-ink">Notifications</h4>
-                            <p className="text-sm text-gray-400">Reminders for your checklist</p>
+                            <h4 className="font-serif font-bold text-ink">Quiet Reminders</h4>
+                            <p className="text-sm text-gray-400">Enable browser notifications</p>
                         </div>
                         <button 
                            onClick={requestNotificationPermission}
@@ -140,10 +136,9 @@ export const ChecklistPage = () => {
           </div>
       )}
 
-      {/* Checklist View */}
       <div className="space-y-4">
           {config.filter(c => c.enabled).length === 0 && (
-              <div className="text-center py-20 text-gray-400 italic">No habits configured. Tap settings to add some.</div>
+              <div className="text-center py-20 text-gray-400 italic">No ritual configured. Open settings to begin.</div>
           )}
           
           {config.filter(c => c.enabled).map(item => (
@@ -155,7 +150,6 @@ export const ChecklistPage = () => {
               />
           ))}
       </div>
-
     </PageContainer>
   );
 };

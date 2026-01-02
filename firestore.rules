@@ -1,0 +1,20 @@
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Explicitly scope all data under /users/{userId}
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      
+      // Allow access to any subcollection within the user's root
+      match /{allPaths=**} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+    
+    // Explicit deny for any root-level or external document
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,7 +1,7 @@
 
 import { DailyEntry, AppData, ChecklistItemConfig } from '../types';
 import { EMPTY_ENTRY } from '../constants';
-import { db } from './firebase';
+import { db, auth } from './firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 const STORAGE_KEY = 'chronos_data_v1';
@@ -25,7 +25,7 @@ export const StorageService = {
       }
       return data;
     } catch (e) {
-      console.error("Failed to load local data", e);
+      console.error("Chronos: Local load failed", e);
       return { entries: {}, principles: [], essays: [], checklistConfig: DEFAULT_CHECKLIST };
     }
   },
@@ -34,7 +34,7 @@ export const StorageService = {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     } catch (e) {
-      console.error("Failed to save local data", e);
+      console.error("Chronos: Local save failed", e);
     }
   },
 
@@ -50,61 +50,57 @@ export const StorageService = {
   },
 
   getEntry: async (dateStr: string, userId?: string): Promise<DailyEntry> => {
-    // 1. If user is logged in, try to fetch from Cloud
-    if (userId && db) {
+    const currentUid = auth.currentUser?.uid || userId;
+    const localData = StorageService.loadLocal();
+    const fallback = localData.entries[dateStr] || { ...EMPTY_ENTRY, id: dateStr };
+
+    if (currentUid && db) {
       try {
-        const docRef = doc(db, 'users', userId, 'entries', dateStr);
+        const docRef = doc(db, 'users', currentUid, 'entries', dateStr);
         const docSnap = await getDoc(docRef);
+        
         if (docSnap.exists()) {
           const remoteData = docSnap.data() as DailyEntry;
-          if (!remoteData.checklist) remoteData.checklist = {};
-          if (!remoteData.state) remoteData.state = { ...EMPTY_ENTRY.state };
-          if (!remoteData.effort) remoteData.effort = { ...EMPTY_ENTRY.effort };
+          const cleanedEntry = {
+            ...EMPTY_ENTRY,
+            ...remoteData,
+            id: dateStr,
+            checklist: remoteData.checklist || {},
+            state: { ...EMPTY_ENTRY.state, ...remoteData.state },
+            effort: { ...EMPTY_ENTRY.effort, ...remoteData.effort },
+          };
           
-          const localData = StorageService.loadLocal();
-          localData.entries[dateStr] = remoteData;
+          localData.entries[dateStr] = cleanedEntry;
           StorageService.saveLocal(localData);
-          
-          return remoteData;
+          return cleanedEntry;
         }
       } catch (e: any) {
-        if (e.code === 'permission-denied') {
-          console.error("Chronos: Critical Permission Error. Check Auth/Rules binding.", e);
-        } else {
-          console.warn("Chronos: Cloud fetch failed, using local cache", e);
-        }
+        console.warn("Chronos: Cloud fetch bypassed/failed. Using vault cache.", e.message);
       }
     }
 
-    const data = StorageService.loadLocal();
-    if (data.entries[dateStr]) {
-      const localEntry = data.entries[dateStr];
-      if (!localEntry.checklist) localEntry.checklist = {};
-      return localEntry;
-    }
-    
-    return { ...EMPTY_ENTRY, id: dateStr };
+    return fallback;
   },
 
   saveEntry: async (entry: DailyEntry, userId?: string) => {
+    const currentUid = auth.currentUser?.uid || userId;
+
     const data = StorageService.loadLocal();
     data.entries[entry.id] = entry;
     StorageService.saveLocal(data);
 
-    if (userId && db) {
+    if (currentUid && db) {
       try {
-        const docRef = doc(db, 'users', userId, 'entries', entry.id);
+        const docRef = doc(db, 'users', currentUid, 'entries', entry.id);
+        // Ensure document strictly matches rule requirements
         await setDoc(docRef, { 
           ...entry, 
-          userId, // Explicitly tag with userId for security rules
+          userId: currentUid, 
+          date: entry.id, // Explicitly match field requirements if any
           timestamp: Date.now() 
         }, { merge: true });
       } catch (e: any) {
-        if (e.code === 'permission-denied') {
-          console.error("Chronos: Sync Blocked. Permission Insufficient.", e);
-        } else {
-          console.error("Chronos: Cloud sync failed", e);
-        }
+        console.error("Chronos: Cloud save error", e.message);
       }
     }
   },
