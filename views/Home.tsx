@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { TreeOfLife } from '../components/TreeOfLife';
@@ -66,6 +67,7 @@ export const Home = () => {
       {/* Logout Button */}
       {user && (
          <button 
+           type="button"
            onClick={() => logout()}
            className="absolute top-6 right-6 z-50 bg-white/50 backdrop-blur px-4 py-2 rounded-full flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400 hover:text-ink hover:bg-white transition-all shadow-sm"
          >

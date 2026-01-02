@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { DailyEntry, ChecklistItemConfig } from '../types';
 import { StorageService } from '../services/storage';
@@ -96,6 +97,7 @@ export const ChecklistPage = () => {
       <div className="flex justify-between items-start mb-8">
           <SectionHeader title="Habit Rituals" subtitle={new Date(date).toLocaleDateString()} />
           <button 
+             type="button"
              onClick={() => setIsEditing(!isEditing)}
              className={`p-3 rounded-full transition-all ${isEditing ? 'bg-organic-600 text-white shadow-lg' : 'bg-white text-gray-400 hover:text-ink shadow-sm'}`}
           >
@@ -114,12 +116,13 @@ export const ChecklistPage = () => {
                                 onChange={(e) => updateItemLabel(item.id, e.target.value)}
                                 className="flex-grow p-2 bg-stone-50 border-b border-gray-200 font-serif text-ink focus:outline-none focus:border-organic-500"
                             />
-                            <button onClick={() => removeItem(item.id)} className="text-red-400 hover:text-red-600 p-2">
+                            <button type="button" onClick={() => removeItem(item.id)} className="text-red-400 hover:text-red-600 p-2">
                                 <Trash2 size={18} />
                             </button>
                         </div>
                     ))}
                     <button 
+                       type="button"
                        onClick={addItem}
                        className="w-full py-3 border-2 border-dashed border-gray-200 text-gray-400 rounded-xl hover:border-organic-400 hover:text-organic-600 transition-colors flex items-center justify-center gap-2 font-bold uppercase text-xs tracking-widest"
                     >
@@ -134,6 +137,7 @@ export const ChecklistPage = () => {
                             <p className="text-sm text-gray-400">Enable browser notifications</p>
                         </div>
                         <button 
+                           type="button"
                            onClick={requestNotificationPermission}
                            disabled={notificationsEnabled}
                            className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest ${notificationsEnabled ? 'bg-organic-50 text-organic-600' : 'bg-ink text-white'}`}

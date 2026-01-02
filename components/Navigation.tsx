@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { 
@@ -85,6 +84,7 @@ export const BottomNav = () => {
 
         {/* The Trigger Button */}
         <button 
+          type="button"
           onClick={() => setIsOpen(!isOpen)}
           className={`
             pointer-events-auto w-16 h-16 rounded-full shadow-2xl flex items-center justify-center

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { DailyEntry, RatingScale as RatingType } from '../types';
 import { COMMON_EMOTIONS, EMPTY_ENTRY } from '../constants';
@@ -19,14 +18,14 @@ const DateNavigator = ({ date, setDate }: { date: string, setDate: (d: string) =
   };
   return (
     <div className="flex items-center justify-between bg-white rounded-xl p-2 mb-6 shadow-sm border border-gray-100">
-       <button onClick={() => changeDate(-1)} className="p-2 hover:bg-stone-50 rounded-lg text-gray-400"><ChevronLeft size={20} /></button>
+       <button type="button" onClick={() => changeDate(-1)} className="p-2 hover:bg-stone-50 rounded-lg text-gray-400"><ChevronLeft size={20} /></button>
        <div className="flex items-center gap-2">
           <Calendar size={14} className="text-organic-600" />
           <span className="font-serif font-bold text-ink text-sm">
              {new Date(date).toLocaleDateString('en-US', { weekday: 'short', month: 'long', day: 'numeric', year: 'numeric' })}
           </span>
        </div>
-       <button onClick={() => changeDate(1)} className="p-2 hover:bg-stone-50 rounded-lg text-gray-400"><ChevronRight size={20} /></button>
+       <button type="button" onClick={() => changeDate(1)} className="p-2 hover:bg-stone-50 rounded-lg text-gray-400"><ChevronRight size={20} /></button>
     </div>
   );
 };
@@ -118,6 +117,7 @@ const StateContent = ({ entry, save }: { entry: DailyEntry, save: any }) => (
               return (
                 <button
                   key={emo}
+                  type="button"
                   onClick={() => save((p: DailyEntry) => ({
                     ...p, 
                     state: {

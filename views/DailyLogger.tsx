@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect } from 'react';
 import { DailyEntry } from '../types';
 import { COMMON_EMOTIONS, MOOD_LABELS, EMPTY_ENTRY } from '../constants';
@@ -160,7 +159,8 @@ export const DailyLogger: React.FC<DailyLoggerProps> = ({ date }) => {
                />
              </div>
              <button 
-                onClick={() => setActiveOverlay('journal')}
+                type="button"
+                onClick={(e) => { e.preventDefault(); setActiveOverlay('journal'); }}
                 className="mt-6 self-start text-xs font-bold text-organic-600 uppercase tracking-widest border-b border-organic-200 pb-0.5 hover:text-organic-800 transition-colors"
              >
                Open Full Journal <ArrowRight size={10} className="inline ml-1"/>
@@ -203,7 +203,8 @@ export const DailyLogger: React.FC<DailyLoggerProps> = ({ date }) => {
               <div className="flex justify-between items-center mb-12">
                  <h2 className="font-serif text-3xl font-bold text-ink">Deep Reflection</h2>
                  <button 
-                   onClick={() => setActiveOverlay(null)}
+                   type="button"
+                   onClick={(e) => { e.preventDefault(); setActiveOverlay(null); }}
                    className="p-2 rounded-full hover:bg-gray-100 text-gray-500"
                  >
                    <X size={24} />
@@ -243,7 +244,7 @@ export const DailyLogger: React.FC<DailyLoggerProps> = ({ date }) => {
               </div>
 
               <div className="py-8 text-center">
-                <button onClick={() => setActiveOverlay(null)} className="text-gray-400 hover:text-ink transition-colors font-sans text-sm font-bold uppercase tracking-widest">
+                <button type="button" onClick={(e) => { e.preventDefault(); setActiveOverlay(null); }} className="text-gray-400 hover:text-ink transition-colors font-sans text-sm font-bold uppercase tracking-widest">
                   Close & Save
                 </button>
               </div>

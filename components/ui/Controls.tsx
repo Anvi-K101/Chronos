@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Minus, Check, Cloud, CloudCheck, RefreshCw } from 'lucide-react';
 
@@ -106,6 +105,7 @@ export const MoodLevelSelector: React.FC<{ value: number | null, onChange: (val:
         return (
           <button
             key={level.label}
+            type="button"
             onClick={() => onChange(level.val)}
             className={`
               flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all
@@ -130,9 +130,9 @@ export const Counter: React.FC<{ value: number; onChange: (val: number) => void;
   <div className="flex items-center justify-between py-3 border-b border-dashed border-organic-100 last:border-0">
     <span className="font-serif text-ink text-lg">{label}</span>
     <div className="flex items-center gap-4 bg-organic-50 rounded-full p-1 border border-organic-100/50">
-      <button onClick={(e) => { e.preventDefault(); onChange(Math.max(0, value - 1)); }} className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center text-stone-500 active:scale-90 transition-all"><Minus size={16} /></button>
+      <button type="button" onClick={(e) => { e.preventDefault(); onChange(Math.max(0, value - 1)); }} className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center text-stone-500 active:scale-90 transition-all"><Minus size={16} /></button>
       <span className="w-8 text-center font-bold text-ink text-lg">{value}</span>
-      <button onClick={(e) => { e.preventDefault(); onChange(value + 1); }} className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center text-organic-600 active:scale-90 transition-all"><Plus size={16} /></button>
+      <button type="button" onClick={(e) => { e.preventDefault(); onChange(value + 1); }} className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center text-organic-600 active:scale-90 transition-all"><Plus size={16} /></button>
     </div>
   </div>
 );
@@ -151,7 +151,7 @@ export const TextInput: React.FC<{ label?: string; value: string; onChange: (val
 );
 
 export const CheckItem: React.FC<{ label: string; checked: boolean; onToggle: () => void }> = ({ label, checked, onToggle }) => (
-  <button onClick={onToggle} className={`w-full flex items-center gap-4 p-4 rounded-xl border transition-all text-left ${checked ? 'bg-organic-50 border-organic-200' : 'bg-white border-gray-100 hover:bg-stone-50'}`}>
+  <button type="button" onClick={onToggle} className={`w-full flex items-center gap-4 p-4 rounded-xl border transition-all text-left ${checked ? 'bg-organic-50 border-organic-200' : 'bg-white border-gray-100 hover:bg-stone-50'}`}>
     <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${checked ? 'bg-organic-600 border-organic-600' : 'border-gray-300'}`}>
       {checked && <Check size={14} strokeWidth={4} className="text-white" />}
     </div>
@@ -182,9 +182,9 @@ export const SaveIndicator: React.FC<{ status: 'saved' | 'saving' | 'idle' | 'lo
 
 export const Stepper: React.FC<{ value: number; onChange: (val: number) => void; step?: number; min?: number; max?: number; unit?: string }> = ({ value, onChange, step = 1, min = 0, max = 100, unit = '' }) => (
   <div className="flex items-center gap-2 bg-stone-50 rounded-lg p-1 border border-organic-100/50">
-     <button onClick={() => onChange(Math.max(min, value - step))} className="w-8 h-8 flex items-center justify-center rounded-md bg-white shadow-sm text-stone-500 active:scale-95 transition-all"><Minus size={14} /></button>
+     <button type="button" onClick={(e) => { e.preventDefault(); onChange(Math.max(min, value - step)); }} className="w-8 h-8 flex items-center justify-center rounded-md bg-white shadow-sm text-stone-500 active:scale-95 transition-all"><Minus size={14} /></button>
      <span className="font-mono text-sm font-bold min-w-[4ch] text-center text-ink">{value}{unit}</span>
-     <button onClick={() => onChange(Math.min(max, value + step))} className="w-8 h-8 flex items-center justify-center rounded-md bg-white shadow-sm text-organic-600 active:scale-95 transition-all"><Plus size={14} /></button>
+     <button type="button" onClick={(e) => { e.preventDefault(); onChange(Math.min(max, value + step)); }} className="w-8 h-8 flex items-center justify-center rounded-md bg-white shadow-sm text-organic-600 active:scale-95 transition-all"><Plus size={14} /></button>
   </div>
 );
 
@@ -195,7 +195,8 @@ export const ChipGroup: React.FC<{ options: string[]; selected: string[]; onChan
       return (
         <button
           key={opt}
-          onClick={() => single ? (!isSelected && onChange([opt])) : (onChange(isSelected ? selected.filter(s => s !== opt) : [...selected, opt]))}
+          type="button"
+          onClick={(e) => { e.preventDefault(); single ? (!isSelected && onChange([opt])) : (onChange(isSelected ? selected.filter(s => s !== opt) : [...selected, opt])); }}
           className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${isSelected ? 'bg-organic-700 text-white shadow-lg' : 'bg-white border border-organic-100 text-gray-500'}`}
         >
           {opt}

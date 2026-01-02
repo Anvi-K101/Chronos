@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useAuth } from '../services/authContext';
 import { ArrowRight, ShieldCheck, TreePine, AlertCircle } from 'lucide-react';
@@ -55,6 +54,7 @@ export const Onboarding = () => {
         
         <div className="space-y-6 w-full max-w-xs">
           <button 
+            type="button"
             onClick={() => setView('auth')}
             className="w-full py-4 bg-ink text-paper rounded-full font-sans font-bold uppercase tracking-widest text-xs hover:bg-organic-800 transition-all shadow-xl hover:shadow-2xl flex items-center justify-center gap-3"
           >
@@ -76,6 +76,7 @@ export const Onboarding = () => {
         <p className="text-gray-400 font-sans text-sm mb-8 uppercase tracking-widest">Confirm credentials</p>
 
         <button 
+          type="button"
           onClick={() => signInGoogle()}
           className="w-full py-4 bg-white border border-stone-200 text-ink rounded-2xl font-sans font-bold uppercase tracking-widest text-xs hover:bg-stone-50 transition-all flex items-center justify-center gap-3 mb-6 shadow-sm"
         >
@@ -122,6 +123,7 @@ export const Onboarding = () => {
         <p className="text-center mt-8 text-xs font-bold uppercase tracking-widest text-gray-400">
           {authMode === 'signup' ? 'Have a vault?' : 'Need a vault?'} 
           <button 
+            type="button"
             onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')}
             className="ml-2 text-ink hover:text-organic-600 underline"
           >
@@ -130,6 +132,7 @@ export const Onboarding = () => {
         </p>
 
         <button 
+          type="button"
           onClick={() => setView('welcome')}
           className="w-full mt-12 text-gray-300 hover:text-gray-500 text-xs font-bold uppercase tracking-widest transition-colors"
         >

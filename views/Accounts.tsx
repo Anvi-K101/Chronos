@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../services/authContext';
 import { StorageService } from '../services/storage';
@@ -87,6 +86,7 @@ export const Accounts = () => {
       {/* Actions */}
       <div className="space-y-4">
         <button 
+          type="button"
           onClick={() => StorageService.exportData()}
           className="w-full py-4 bg-white border border-stone-200 text-ink rounded-2xl font-sans font-bold uppercase tracking-widest text-xs hover:bg-stone-50 transition-all flex items-center justify-center gap-3 shadow-sm"
         >
@@ -94,6 +94,7 @@ export const Accounts = () => {
         </button>
 
         <button 
+          type="button"
           onClick={() => logout()}
           className="w-full py-4 bg-ink text-paper rounded-2xl font-sans font-bold uppercase tracking-widest text-xs hover:bg-stone-800 transition-all flex items-center justify-center gap-3 shadow-xl"
         >
