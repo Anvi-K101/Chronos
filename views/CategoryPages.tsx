@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { DailyEntry, RatingScale as RatingType } from '../types';
 import { COMMON_EMOTIONS, EMPTY_ENTRY } from '../constants';
@@ -32,61 +33,62 @@ const DateNavigator = ({ date, setDate }: { date: string, setDate: (d: string) =
 
 const useDailyEntry = (dateStr: string) => {
   const { user, loading: authLoading } = useAuth();
-  
   const [entry, setEntry] = useState<DailyEntry>(() => {
     const local = StorageService.loadLocal();
     return local.entries[dateStr] || { ...EMPTY_ENTRY, id: dateStr };
   });
   
-  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'idle' | 'local'>('idle');
-  
-  const hydratedRef = useRef(false);
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'idle' | 'local' | 'error'>('idle');
   const userHasEditedRef = useRef(false);
-  const dateRef = useRef(dateStr);
+  const saveTimeoutRef = useRef<number | null>(null);
 
+  // Initial Load
   useEffect(() => {
-    if (dateRef.current !== dateStr) {
-      hydratedRef.current = false;
-      userHasEditedRef.current = false;
-      dateRef.current = dateStr;
-    }
-    
     const local = StorageService.loadLocal();
     const cached = local.entries[dateStr] || { ...EMPTY_ENTRY, id: dateStr };
     setEntry(cached);
+    userHasEditedRef.current = false;
 
     if (authLoading) return;
 
     let mounted = true;
     StorageService.getEntry(dateStr, user?.uid).then(remote => {
-      if (mounted && !userHasEditedRef.current && !hydratedRef.current && remote) {
+      if (mounted && !userHasEditedRef.current && remote) {
         setEntry(remote);
-        hydratedRef.current = true;
       }
     });
 
-    return () => { mounted = false; };
+    return () => { 
+      mounted = false; 
+      if (saveTimeoutRef.current) window.clearTimeout(saveTimeoutRef.current);
+    };
   }, [dateStr, user, authLoading]);
 
-  const save = useCallback(async (updater: (prev: DailyEntry) => DailyEntry) => {
-    userHasEditedRef.current = true;
+  // Handle saving with debounce to prevent excessive writes and accidental redirects
+  const triggerSave = useCallback((updatedEntry: DailyEntry) => {
+    if (saveTimeoutRef.current) window.clearTimeout(saveTimeoutRef.current);
     
+    setSaveStatus('saving');
+    saveTimeoutRef.current = window.setTimeout(async () => {
+      try {
+        await StorageService.saveEntry(updatedEntry, user?.uid);
+        setSaveStatus('saved');
+        setTimeout(() => setSaveStatus(prev => prev === 'saved' ? 'idle' : prev), 2000);
+      } catch (err) {
+        setSaveStatus('local'); // Fallback if cloud fails but local worked
+        setTimeout(() => setSaveStatus(prev => prev === 'local' ? 'idle' : prev), 3000);
+      }
+    }, 1000); // 1s debounce
+  }, [user]);
+
+  const save = useCallback((updater: (prev: DailyEntry) => DailyEntry) => {
+    userHasEditedRef.current = true;
     setEntry(prev => {
       const next = updater(prev);
-      setSaveStatus('saving');
-      
-      StorageService.saveEntry(next, user?.uid)
-        .then(() => {
-          setSaveStatus('saved');
-          setTimeout(() => setSaveStatus('idle'), 2000);
-        })
-        .catch(() => {
-          setSaveStatus('idle');
-        });
-        
+      triggerSave(next);
       return next;
     });
-  }, [user]);
+  }, [triggerSave]);
 
   return { entry, save, saveStatus };
 };
@@ -120,6 +122,7 @@ const StateContent = ({ entry, save }: { entry: DailyEntry, save: any }) => (
                   type="button"
                   onClick={(e) => {
                     e.preventDefault();
+                    e.stopPropagation();
                     save((p: DailyEntry) => ({
                       ...p, 
                       state: {
