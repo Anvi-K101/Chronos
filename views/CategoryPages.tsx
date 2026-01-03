@@ -19,14 +19,14 @@ const DateNavigator = ({ date, setDate }: { date: string, setDate: (d: string) =
   };
   return (
     <div className="flex items-center justify-between bg-white rounded-xl p-2 mb-6 shadow-sm border border-gray-100">
-       <button type="button" onClick={(e) => { e.preventDefault(); changeDate(-1); }} className="p-2 hover:bg-stone-50 rounded-lg text-gray-400"><ChevronLeft size={20} /></button>
+       <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); changeDate(-1); }} className="p-2 hover:bg-stone-50 rounded-lg text-gray-400"><ChevronLeft size={20} /></button>
        <div className="flex items-center gap-2">
           <Calendar size={14} className="text-organic-600" />
           <span className="font-serif font-bold text-ink text-sm">
              {new Date(date).toLocaleDateString('en-US', { weekday: 'short', month: 'long', day: 'numeric', year: 'numeric' })}
           </span>
        </div>
-       <button type="button" onClick={(e) => { e.preventDefault(); changeDate(1); }} className="p-2 hover:bg-stone-50 rounded-lg text-gray-400"><ChevronRight size={20} /></button>
+       <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); changeDate(1); }} className="p-2 hover:bg-stone-50 rounded-lg text-gray-400"><ChevronRight size={20} /></button>
     </div>
   );
 };
@@ -42,7 +42,7 @@ const useDailyEntry = (dateStr: string) => {
   const userHasEditedRef = useRef(false);
   const saveTimeoutRef = useRef<number | null>(null);
 
-  // Initial Load
+  // Initial Load & Cross-Device Sync
   useEffect(() => {
     const local = StorageService.loadLocal();
     const cached = local.entries[dateStr] || { ...EMPTY_ENTRY, id: dateStr };
@@ -52,10 +52,18 @@ const useDailyEntry = (dateStr: string) => {
     if (authLoading) return;
 
     let mounted = true;
+    setSaveStatus('saving'); // Indicate we're checking the vault
     StorageService.getEntry(dateStr, user?.uid).then(remote => {
-      if (mounted && !userHasEditedRef.current && remote) {
-        setEntry(remote);
+      if (mounted) {
+        // Only update if the user hasn't started typing on this device yet
+        if (!userHasEditedRef.current && remote) {
+          setEntry(remote);
+        }
+        setSaveStatus('saved');
+        setTimeout(() => setSaveStatus(prev => prev === 'saved' ? 'idle' : prev), 1500);
       }
+    }).catch(() => {
+        if (mounted) setSaveStatus('local');
     });
 
     return () => { 
@@ -64,7 +72,7 @@ const useDailyEntry = (dateStr: string) => {
     };
   }, [dateStr, user, authLoading]);
 
-  // Handle saving with debounce to prevent excessive writes and accidental redirects
+  // Handle saving with debounce
   const triggerSave = useCallback((updatedEntry: DailyEntry) => {
     if (saveTimeoutRef.current) window.clearTimeout(saveTimeoutRef.current);
     
@@ -75,10 +83,10 @@ const useDailyEntry = (dateStr: string) => {
         setSaveStatus('saved');
         setTimeout(() => setSaveStatus(prev => prev === 'saved' ? 'idle' : prev), 2000);
       } catch (err) {
-        setSaveStatus('local'); // Fallback if cloud fails but local worked
+        setSaveStatus('local');
         setTimeout(() => setSaveStatus(prev => prev === 'local' ? 'idle' : prev), 3000);
       }
-    }, 1000); // 1s debounce
+    }, 1500); 
   }, [user]);
 
   const save = useCallback((updater: (prev: DailyEntry) => DailyEntry) => {
@@ -215,6 +223,6 @@ const FutureContent = ({ entry, save }: { entry: DailyEntry, save: any }) => (
 export const StatePage = () => <PageWrapper Component={StateContent} title="Vital Signs" subtitle="Daily State" />;
 export const EffortPage = () => <PageWrapper Component={EffortContent} title="Energy Allocation" subtitle="Effort & Recovery" />;
 export const AchievementsPage = () => <PageWrapper Component={AchievementsContent} title="Daily Progress" subtitle="Wins & Lessons" />;
-export const ReflectionsPage = () => <PageWrapper Component={ReflectionsContent} title="Introspection." subtitle="Daily Reflections" />;
+export const ReflectionsPage = () => <PageWrapper Component={ReflectionsContent} title="Introspection" subtitle="Daily Reflections" />;
 export const MemoriesPage = () => <PageWrapper Component={MemoriesContent} title="Archive" subtitle="Preserving Moments" />;
 export const FuturePage = () => <PageWrapper Component={FutureContent} title="Orientation" subtitle="Gratitude & Future" />;

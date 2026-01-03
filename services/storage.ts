@@ -2,11 +2,9 @@
 import { DailyEntry, AppData, ChecklistItemConfig } from '../types';
 import { EMPTY_ENTRY } from '../constants';
 import { db, auth, isConfigured } from './firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, getDocs, query, where } from '@firebase/firestore';
 
 const STORAGE_KEY = 'chronos_data_v1';
-// Circuit breaker to prevent constant console errors if permissions are denied
-let cloudSyncSilenced = false;
 
 const DEFAULT_CHECKLIST: ChecklistItemConfig[] = [
   { id: 'journal', label: 'Write in Journal', enabled: true },
@@ -38,11 +36,36 @@ export const StorageService = {
     } catch (e) {}
   },
 
+  // --- Global Sync (For New Devices/Mobile) ---
+  fetchAllEntries: async (userId: string): Promise<Record<string, DailyEntry>> => {
+    if (!db) return {};
+    try {
+      const entriesRef = collection(db, 'users', userId, 'entries');
+      const q = query(entriesRef);
+      const querySnapshot = await getDocs(q);
+      
+      const remoteEntries: Record<string, DailyEntry> = {};
+      querySnapshot.forEach((doc) => {
+        remoteEntries[doc.id] = doc.data() as DailyEntry;
+      });
+
+      // Merge with local
+      const local = StorageService.loadLocal();
+      local.entries = { ...local.entries, ...remoteEntries };
+      StorageService.saveLocal(local);
+      
+      return remoteEntries;
+    } catch (e: any) {
+      console.warn("[Storage] Failed to fetch vault history:", e.message);
+      return {};
+    }
+  },
+
   // --- Configuration Management ---
   getChecklistConfig: async (userId?: string): Promise<ChecklistItemConfig[]> => {
     const local = StorageService.loadLocal();
     const uid = userId || auth.currentUser?.uid;
-    if (!uid || !db || cloudSyncSilenced) return local.checklistConfig;
+    if (!uid || !db) return local.checklistConfig;
 
     try {
       const snap = await getDoc(doc(db, 'users', uid, 'config', 'checklist'));
@@ -53,10 +76,7 @@ export const StorageService = {
         return remote;
       }
     } catch (e: any) {
-      if (e.code === 'permission-denied') {
-        cloudSyncSilenced = true;
-        console.info("[Storage] Cloud config restricted. Continuing in local-first mode.");
-      }
+      if (e.code !== 'permission-denied') console.warn("[Storage] Config sync issue:", e.message);
     }
     return local.checklistConfig;
   },
@@ -67,14 +87,14 @@ export const StorageService = {
     StorageService.saveLocal(local);
 
     const uid = userId || auth.currentUser?.uid;
-    if (uid && db && !cloudSyncSilenced) {
+    if (uid && db) {
       try {
         await setDoc(doc(db, 'users', uid, 'config', 'checklist'), { 
           items: config, 
           updatedAt: Date.now() 
         }, { merge: true });
       } catch (e: any) {
-        if (e.code === 'permission-denied') cloudSyncSilenced = true;
+        console.warn("[Storage] Config write issue:", e.message);
       }
     }
   },
@@ -85,7 +105,7 @@ export const StorageService = {
     const cached = local.entries[dateStr] || { ...EMPTY_ENTRY, id: dateStr };
     const uid = userId || auth.currentUser?.uid;
 
-    if (!uid || !db || cloudSyncSilenced) return cached;
+    if (!uid || !db) return cached;
 
     try {
       const snap = await getDoc(doc(db, 'users', uid, 'entries', dateStr));
@@ -104,22 +124,18 @@ export const StorageService = {
         return merged;
       }
     } catch (e: any) {
-      if (e.code === 'permission-denied') {
-        cloudSyncSilenced = true;
-      }
+      console.warn(`[Storage] Remote fetch skipped for ${dateStr}:`, e.message);
     }
     return cached;
   },
 
   saveEntry: async (entry: DailyEntry, userId?: string): Promise<void> => {
-    // 1. Local-First: Immediate persistence to browser storage
     const local = StorageService.loadLocal();
     local.entries[entry.id] = entry;
     StorageService.saveLocal(local);
 
-    // 2. Cloud Sync: Attempt to persist to user's Firebase account
     const uid = userId || auth.currentUser?.uid;
-    if (!uid || !db || cloudSyncSilenced) return;
+    if (!uid || !db) return;
 
     try {
       await setDoc(doc(db, 'users', uid, 'entries', entry.id), { 
@@ -128,16 +144,12 @@ export const StorageService = {
         updatedAt: Date.now() 
       }, { merge: true });
     } catch (e: any) {
-      if (e.code === 'permission-denied') {
-        cloudSyncSilenced = true;
-        console.info("[Storage] Cloud write restricted. Your data is still safe in local browser storage.");
-      } else {
-        throw e;
-      }
+      console.error(`[Storage] Cloud sync failed for ${entry.id}:`, e.message);
+      throw e;
     }
   },
 
-  isCloudAvailable: () => !!(isConfigured && auth.currentUser && !cloudSyncSilenced),
+  isCloudAvailable: () => !!(isConfigured && auth.currentUser),
 
   exportData: () => {
      const data = StorageService.loadLocal();

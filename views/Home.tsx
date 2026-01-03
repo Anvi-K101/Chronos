@@ -1,13 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+
+import { DailyEntry } from '../types';
 import { TreeOfLife } from '../components/TreeOfLife';
 import { WisdomPanel } from '../components/WisdomPanel';
 import { StorageService } from '../services/storage';
 import { useAuth } from '../services/authContext';
-import { ArrowRight, LogOut, CheckCircle2 } from 'lucide-react';
+import { ArrowRight, LogOut, CheckCircle2, RefreshCw } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 
 export const Home = () => {
   const { user, logout, loading: authLoading } = useAuth();
+  const [isSyncing, setIsSyncing] = useState(false);
   const [stats, setStats] = useState({ 
       count: 0, 
       activity: 0, 
@@ -20,62 +23,75 @@ export const Home = () => {
   const [todayCompleted, setTodayCompleted] = useState(0);
   const [todayTotal, setTodayTotal] = useState(0);
 
+  const refreshData = useCallback(async () => {
+    const data = StorageService.loadLocal();
+    const entries = Object.values(data.entries);
+    
+    // If we have a user but no entries, we are likely on a new device (Mobile)
+    if (user && entries.length === 0 && !isSyncing) {
+        setIsSyncing(true);
+        await StorageService.fetchAllEntries(user.uid);
+        setIsSyncing(false);
+        // Recurse once with fresh data
+        return refreshData();
+    }
+
+    const moodSum = entries.reduce((acc, val) => acc + (val.state?.mood || 5), 0);
+    const creativeSum = entries.reduce((acc, val) => acc + (val.effort?.creativeHours || 0), 0);
+    const stressSum = entries.reduce((acc, val) => acc + (val.state?.stress || 0), 0);
+    const claritySum = entries.reduce((acc, val) => acc + (val.state?.mentalClarity || 0), 0);
+    
+    const checklistSum = entries.reduce((acc, val) => {
+        if (!val.checklist) return acc;
+        return acc + Object.values(val.checklist).filter(Boolean).length;
+    }, 0);
+
+    setStats({
+      count: entries.length,
+      activity: entries.length > 0 ? 1 : 0,
+      avgMood: entries.length ? moodSum / entries.length : 5,
+      totalCreative: creativeSum,
+      totalStress: stressSum,
+      totalClarity: claritySum,
+      checklistComplete: checklistSum
+    });
+
+    // Today's specific checklist progress
+    const todayStr = new Date().toISOString().split('T')[0];
+    const todayEntry = await StorageService.getEntry(todayStr, user?.uid);
+    if (todayEntry && todayEntry.checklist) {
+        setTodayCompleted(Object.values(todayEntry.checklist).filter(Boolean).length);
+    }
+    
+    const config = await StorageService.getChecklistConfig(user?.uid);
+    setTodayTotal(config.filter(c => c.enabled).length);
+  }, [user, isSyncing]);
+
   useEffect(() => {
     if (authLoading) return;
-
-    const refreshData = async () => {
-        const data = StorageService.loadLocal();
-        const entries = Object.values(data.entries);
-        
-        const moodSum = entries.reduce((acc, val) => acc + (val.state?.mood || 5), 0);
-        const creativeSum = entries.reduce((acc, val) => acc + (val.effort?.creativeHours || 0), 0);
-        const stressSum = entries.reduce((acc, val) => acc + (val.state?.stress || 0), 0);
-        const claritySum = entries.reduce((acc, val) => acc + (val.state?.mentalClarity || 0), 0);
-        
-        const checklistSum = entries.reduce((acc, val) => {
-            if (!val.checklist) return acc;
-            return acc + Object.values(val.checklist).filter(Boolean).length;
-        }, 0);
-
-        const currentStats = {
-          count: entries.length,
-          activity: entries.length > 0 ? 1 : 0,
-          avgMood: entries.length ? moodSum / entries.length : 5,
-          totalCreative: creativeSum,
-          totalStress: stressSum,
-          totalClarity: claritySum,
-          checklistComplete: checklistSum
-        };
-
-        setStats(currentStats);
-
-        // Today's specific checklist progress
-        const todayStr = new Date().toISOString().split('T')[0];
-        const todayEntry = await StorageService.getEntry(todayStr, user?.uid);
-        if (todayEntry && todayEntry.checklist) {
-            setTodayCompleted(Object.values(todayEntry.checklist).filter(Boolean).length);
-        }
-        
-        const config = await StorageService.getChecklistConfig(user?.uid);
-        setTodayTotal(config.filter(c => c.enabled).length);
-    };
-
     refreshData();
-  }, [user, authLoading]);
+  }, [user, authLoading, refreshData]);
 
   return (
     <div className="relative h-screen w-full bg-paper overflow-hidden flex flex-col items-center justify-center">
       
-      {/* Logout Button */}
-      {user && (
-         <button 
-           type="button"
-           onClick={(e) => { e.preventDefault(); logout(); }}
-           className="absolute top-6 right-6 z-50 bg-white/50 backdrop-blur px-4 py-2 rounded-full flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400 hover:text-ink hover:bg-white transition-all shadow-sm"
-         >
-           <LogOut size={12} /> Sign Out
-         </button>
-      )}
+      {/* Sync Status / Logout */}
+      <div className="absolute top-6 right-6 z-50 flex items-center gap-3">
+        {isSyncing && (
+          <div className="bg-white/80 backdrop-blur px-3 py-2 rounded-full flex items-center gap-2 text-[9px] font-bold uppercase tracking-widest text-organic-600 animate-pulse border border-organic-100 shadow-sm">
+            <RefreshCw size={10} className="animate-spin" /> Pulling Vault
+          </div>
+        )}
+        {user && (
+           <button 
+             type="button"
+             onClick={(e) => { e.preventDefault(); logout(); }}
+             className="bg-white/50 backdrop-blur px-4 py-2 rounded-full flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400 hover:text-ink hover:bg-white transition-all shadow-sm"
+           >
+             <LogOut size={12} /> Sign Out
+           </button>
+        )}
+      </div>
 
       {/* Visual Layer */}
       <TreeOfLife 
