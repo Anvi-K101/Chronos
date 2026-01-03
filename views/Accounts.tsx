@@ -3,7 +3,7 @@ import { useAuth } from '../services/authContext';
 import { StorageService } from '../services/storage';
 import { PageContainer, SectionHeader, Card } from '../components/ui/Controls';
 import { 
-  User, ShieldCheck, CloudCheck, HardDrive, 
+  User, ShieldCheck, Cloud, HardDrive, 
   LogOut, Download, AlertCircle, Calendar 
 } from 'lucide-react';
 
@@ -51,7 +51,7 @@ export const Accounts = () => {
            <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <span className="flex items-center gap-2 text-sm text-gray-500 font-sans">
-                  <CloudCheck size={16} className="text-organic-500" /> Cloud Sync
+                  <Cloud size={16} className="text-organic-500" /> Cloud Sync
                 </span>
                 <span className="text-xs font-bold uppercase tracking-widest text-organic-600 bg-organic-50 px-3 py-1 rounded-full">Active</span>
               </div>

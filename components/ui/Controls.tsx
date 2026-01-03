@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Minus, Check, Cloud, CloudCheck, RefreshCw } from 'lucide-react';
+import { Plus, Minus, Check, Cloud, RefreshCw } from 'lucide-react';
 
 export const PageContainer: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
   <div className={`min-h-screen pb-32 pt-24 px-6 md:px-12 max-w-3xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 ${className}`}>
@@ -167,7 +167,7 @@ export const SaveIndicator: React.FC<{ status: 'saved' | 'saving' | 'idle' | 'lo
         bg-white/95 backdrop-blur-md px-4 py-2 rounded-full shadow-float border flex items-center gap-3 transition-colors
         ${isSaving ? 'border-orange-100' : 'border-organic-100'}
       `}>
-         {isSaving ? <RefreshCw size={14} className="text-orange-500 animate-spin" /> : <CloudCheck size={14} className="text-organic-600" />}
+         {isSaving ? <RefreshCw size={14} className="text-orange-500 animate-spin" /> : <Cloud size={14} className="text-organic-600" />}
          <span className={`text-[10px] font-bold uppercase tracking-widest ${isSaving ? 'text-orange-600' : 'text-organic-600'}`}>
           {label}
          </span>
