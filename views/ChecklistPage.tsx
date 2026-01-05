@@ -3,16 +3,17 @@ import { DailyEntry, ChecklistItemConfig } from '../types';
 import { StorageService } from '../services/storage';
 import { useAuth } from '../services/authContext';
 import { PageContainer, SectionHeader, Card, SaveIndicator, CheckItem } from '../components/ui/Controls';
-import { Settings, Plus, Trash2, Check } from 'lucide-react';
-import { EMPTY_ENTRY } from '../constants';
+import { Settings, Plus, Trash2, Check, Loader2 } from 'lucide-react';
+import { EMPTY_ENTRY, getLocalISODate } from '../constants';
 
 export const ChecklistPage = () => {
   const { user, loading: authLoading } = useAuth();
-  const [date] = useState(new Date().toISOString().split('T')[0]);
+  const [date] = useState(getLocalISODate());
   const [entry, setEntry] = useState<DailyEntry>({ ...EMPTY_ENTRY, id: date });
   const [config, setConfig] = useState<ChecklistItemConfig[]>([]);
-  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'idle'>('idle');
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'idle' | 'error'>('idle');
   const [isEditing, setIsEditing] = useState(false);
+  const [isCloudChecking, setIsCloudChecking] = useState(true);
   
   const [notificationsEnabled, setNotificationsEnabled] = useState('Notification' in window && Notification.permission === 'granted');
 
@@ -20,21 +21,39 @@ export const ChecklistPage = () => {
     if (authLoading) return;
 
     let mounted = true;
+    setIsCloudChecking(true);
     
-    StorageService.getChecklistConfig(user?.uid).then(cfg => {
-      if (mounted) setConfig(cfg);
-    });
+    // Initial local load for instant UI
+    const local = StorageService.loadLocal();
+    setConfig(local.checklistConfig);
+    setEntry(local.entries[date] || { ...EMPTY_ENTRY, id: date });
 
-    StorageService.getEntry(date, user?.uid).then(data => {
-      if (mounted) setEntry(data);
-    }).catch((err) => {
-      console.warn("Chronos: Checklist entry fetch failed", err);
-    });
+    if (!user) {
+        setIsCloudChecking(false);
+        return;
+    }
 
+    const loadAll = async () => {
+        try {
+            const [cfg, data] = await Promise.all([
+                StorageService.getChecklistConfig(user.uid),
+                StorageService.getEntry(date, user.uid)
+            ]);
+            if (mounted) {
+                setConfig(cfg);
+                setEntry(data);
+                setIsCloudChecking(false);
+            }
+        } catch (err) {
+            if (mounted) setIsCloudChecking(false);
+        }
+    };
+
+    loadAll();
     return () => { mounted = false; };
   }, [date, user, authLoading]);
 
-  const toggleTask = (id: string) => {
+  const toggleTask = async (id: string) => {
     const currentVal = entry.checklist[id] || false;
     const newVal = !currentVal;
     
@@ -48,19 +67,36 @@ export const ChecklistPage = () => {
 
     setEntry(updatedEntry); 
     setSaveStatus('saving');
-    StorageService.saveEntry(updatedEntry, user?.uid).then(() => {
-        setSaveStatus('saved');
+    
+    try {
+        if (user) {
+            await StorageService.saveEntry(updatedEntry, user.uid);
+            setSaveStatus('saved');
+        } else {
+            setSaveStatus('saved'); // Local-only
+        }
         setTimeout(() => setSaveStatus('idle'), 1500);
-    });
+    } catch (e) {
+        setSaveStatus('error');
+        setTimeout(() => setSaveStatus('idle'), 3000);
+    }
   };
 
-  const saveConfig = (newConfig: ChecklistItemConfig[]) => {
+  const saveConfig = async (newConfig: ChecklistItemConfig[]) => {
       setConfig(newConfig);
       setSaveStatus('saving');
-      StorageService.saveChecklistConfig(newConfig, user?.uid).then(() => {
-        setSaveStatus('saved');
+      try {
+        if (user) {
+            await StorageService.saveChecklistConfig(newConfig, user.uid);
+            setSaveStatus('saved');
+        } else {
+            setSaveStatus('saved'); // Local-only
+        }
         setTimeout(() => setSaveStatus('idle'), 1500);
-      });
+      } catch (e) {
+        setSaveStatus('error');
+        setTimeout(() => setSaveStatus('idle'), 3000);
+      }
   };
 
   const addItem = (e: React.MouseEvent) => {
@@ -95,15 +131,22 @@ export const ChecklistPage = () => {
       <SaveIndicator status={saveStatus} />
       
       <div className="flex justify-between items-start mb-8">
-          <SectionHeader title="Habit Rituals" subtitle={new Date(date).toLocaleDateString()} />
+          <SectionHeader title="Habit Rituals" subtitle={new Date(date + 'T00:00:00').toLocaleDateString()} />
           <button 
              type="button"
              onClick={(e) => { e.preventDefault(); setIsEditing(!isEditing); }}
-             className={`p-3 rounded-full transition-all ${isEditing ? 'bg-organic-600 text-white shadow-lg' : 'bg-white text-gray-400 hover:text-ink shadow-sm'}`}
+             className={`p-3 rounded-full transition-all active:scale-90 ${isEditing ? 'bg-organic-600 text-white shadow-lg' : 'bg-white text-gray-400 hover:text-ink shadow-sm'}`}
           >
               {isEditing ? <Check size={20} /> : <Settings size={20} />}
           </button>
       </div>
+
+      {isCloudChecking && (
+          <div className="flex items-center justify-center mb-6 text-organic-300 gap-2">
+              <Loader2 className="animate-spin" size={12} />
+              <span className="font-bold uppercase tracking-widest text-[10px] opacity-60">Checking Vault</span>
+          </div>
+      )}
 
       {isEditing && (
           <div className="animate-in slide-in-from-top-4 mb-8">
@@ -151,7 +194,7 @@ export const ChecklistPage = () => {
       )}
 
       <div className="space-y-4">
-          {config.filter(c => c.enabled).length === 0 && (
+          {config.filter(c => c.enabled).length === 0 && !isEditing && (
               <div className="text-center py-20 text-gray-400 italic">No ritual configured. Open settings to begin.</div>
           )}
           

@@ -1,5 +1,4 @@
-
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Home } from './views/Home';
 import { BottomNav } from './components/Navigation';
@@ -13,28 +12,33 @@ import {
   ReflectionsPage, MemoriesPage, FuturePage 
 } from './views/CategoryPages';
 import { StorageService } from './services/storage';
-import { LoadingSpinner } from './components/ui/Controls';
+import { Loader2 } from 'lucide-react';
 
 const Archive = () => {
-  const [entries, setEntries] = React.useState<any[]>([]);
-  const { hydrated, loading: authLoading } = useAuth();
-  const [loading, setLoading] = React.useState(true);
+  const { user } = useAuth();
+  const [entries, setEntries] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  React.useEffect(() => {
-    if (authLoading || !hydrated) return;
-
-    const loadData = async () => {
-      setLoading(true);
-      const data = await StorageService.loadLocal();
-      const sorted = Object.values(data.entries).sort((a: any, b: any) => b.id.localeCompare(a.id));
-      setEntries(sorted);
-      setLoading(false);
-    };
+  useEffect(() => {
+    if (!user) return;
     
-    loadData();
-  }, [hydrated, authLoading]);
+    let mounted = true;
+    StorageService.getAllEntries(user.uid).then(all => {
+      if (mounted) {
+        setEntries(all);
+        setLoading(false);
+      }
+    });
 
-  if (loading) return <div className="min-h-screen bg-paper pt-24"><LoadingSpinner message="Opening Archive..." /></div>;
+    return () => { mounted = false; };
+  }, [user]);
+
+  if (loading) return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-paper text-organic-400 gap-4">
+      <Loader2 size={32} className="animate-spin" />
+      <span className="text-xs font-bold uppercase tracking-widest">Opening Timeline</span>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-paper pb-32 pt-24 px-6 max-w-3xl mx-auto">
@@ -46,7 +50,7 @@ const Archive = () => {
              <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-all">
                 <div className="flex justify-between items-baseline mb-2">
                    <h3 className="font-serif text-xl font-bold text-ink">
-                      {new Date(entry.id).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}
+                      {new Date(entry.id + 'T00:00:00').toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}
                    </h3>
                    {entry.state.mood && <span className="font-sans text-xs font-bold text-gray-400">Mood: {entry.state.mood}</span>}
                 </div>
@@ -69,8 +73,9 @@ const ProtectedContent = () => {
   const { user, loading } = useAuth();
   
   if (loading) return (
-    <div className="min-h-screen bg-paper flex items-center justify-center">
-      <div className="w-10 h-10 border-4 border-stone-200 border-t-organic-600 rounded-full animate-spin"></div>
+    <div className="min-h-screen bg-paper flex flex-col items-center justify-center gap-4 text-organic-400">
+      <Loader2 size={32} className="animate-spin" />
+      <span className="text-xs font-bold uppercase tracking-widest">Waking Up...</span>
     </div>
   );
 
@@ -84,6 +89,7 @@ const ProtectedContent = () => {
         <Route path="/checklist" element={<ChecklistPage />} />
         <Route path="/accounts" element={<Accounts />} />
         
+        {/* Logging Categories */}
         <Route path="/log/state" element={<StatePage />} />
         <Route path="/log/effort" element={<EffortPage />} />
         <Route path="/log/achievements" element={<AchievementsPage />} />

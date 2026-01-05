@@ -1,4 +1,3 @@
-
 import { DailyEntry } from './types';
 
 export const MOOD_LABELS = {
@@ -14,6 +13,17 @@ export const COMMON_EMOTIONS = [
   "Grateful", "Resentful", "Inspired", "Bored", "Confident", "Insecure",
   "Lonely", "Loved", "Overwhelmed", "Peaceful"
 ];
+
+/**
+ * Returns YYYY-MM-DD for the user's current local date.
+ * Avoids UTC flip issues where "today" changes at midnight UTC.
+ */
+export const getLocalISODate = (dateInput: Date = new Date()): string => {
+  const year = dateInput.getFullYear();
+  const month = String(dateInput.getMonth() + 1).padStart(2, '0');
+  const day = String(dateInput.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 
 export const EMPTY_ENTRY: DailyEntry = {
   id: '',

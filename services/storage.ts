@@ -1,11 +1,9 @@
-
 import { DailyEntry, AppData, ChecklistItemConfig } from '../types';
 import { EMPTY_ENTRY } from '../constants';
 import { db, auth, isConfigured } from './firebase';
-import { doc, getDoc, setDoc, collection, getDocs, query, orderBy } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, getDocs, query, where, orderBy } from 'firebase/firestore';
 
 const STORAGE_KEY = 'chronos_data_v1';
-let cloudSyncSilenced = false;
 
 const DEFAULT_CHECKLIST: ChecklistItemConfig[] = [
   { id: 'journal', label: 'Write in Journal', enabled: true },
@@ -14,6 +12,7 @@ const DEFAULT_CHECKLIST: ChecklistItemConfig[] = [
 ];
 
 export const StorageService = {
+  // --- Local Management ---
   loadLocal: (): AppData => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -33,51 +32,18 @@ export const StorageService = {
   saveLocal: (data: AppData) => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    } catch (e) {}
-  },
-
-  // --- Bulk Cloud Sync ---
-  syncAllFromCloud: async (userId: string): Promise<AppData> => {
-    if (!db || cloudSyncSilenced) return StorageService.loadLocal();
-
-    try {
-      const local = StorageService.loadLocal();
-      
-      // 1. Sync Config
-      const configSnap = await getDoc(doc(db, 'users', userId, 'config', 'checklist'));
-      if (configSnap.exists()) {
-        local.checklistConfig = configSnap.data().items;
-      }
-
-      // 2. Sync All Entries (Limit 365 for performance)
-      const entriesRef = collection(db, 'users', userId, 'entries');
-      const q = query(entriesRef, orderBy('timestamp', 'desc'));
-      const entriesSnap = await getDocs(q);
-      
-      entriesSnap.forEach(docSnap => {
-        const data = docSnap.data() as DailyEntry;
-        local.entries[docSnap.id] = {
-            ...EMPTY_ENTRY,
-            ...data,
-            id: docSnap.id
-        };
-      });
-
-      StorageService.saveLocal(local);
-      return local;
-    } catch (e: any) {
-      console.warn("[Storage] Cloud sync failed:", e);
-      return StorageService.loadLocal();
+    } catch (e) {
+      console.warn("[Storage] Local cache failed", e);
     }
   },
 
-  getChecklistConfig: async (userId?: string): Promise<ChecklistItemConfig[]> => {
+  // --- Checklist Config (Cloud First) ---
+  getChecklistConfig: async (userId: string): Promise<ChecklistItemConfig[]> => {
     const local = StorageService.loadLocal();
-    const uid = userId || auth.currentUser?.uid;
-    if (!uid || !db || cloudSyncSilenced) return local.checklistConfig;
+    if (!userId || !db) return local.checklistConfig;
 
     try {
-      const snap = await getDoc(doc(db, 'users', uid, 'config', 'checklist'));
+      const snap = await getDoc(doc(db, 'users', userId, 'config', 'checklist'));
       if (snap.exists()) {
         const remote = snap.data().items as ChecklistItemConfig[];
         local.checklistConfig = remote;
@@ -85,75 +51,112 @@ export const StorageService = {
         return remote;
       }
     } catch (e: any) {
-      if (e.code === 'permission-denied') cloudSyncSilenced = true;
+      console.warn("[Storage] Cloud config fetch failed, using local.", e.message);
     }
     return local.checklistConfig;
   },
 
-  saveChecklistConfig: async (config: ChecklistItemConfig[], userId?: string) => {
+  saveChecklistConfig: async (config: ChecklistItemConfig[], userId: string) => {
     const local = StorageService.loadLocal();
     local.checklistConfig = config;
     StorageService.saveLocal(local);
 
-    const uid = userId || auth.currentUser?.uid;
-    if (uid && db && !cloudSyncSilenced) {
+    if (userId && db) {
       try {
-        await setDoc(doc(db, 'users', uid, 'config', 'checklist'), { 
+        await setDoc(doc(db, 'users', userId, 'config', 'checklist'), { 
           items: config, 
           updatedAt: Date.now() 
         }, { merge: true });
       } catch (e: any) {
-        if (e.code === 'permission-denied') cloudSyncSilenced = true;
+        console.error("[Storage] Failed to save checklist to cloud:", e.message);
+        throw e;
       }
     }
   },
 
-  getEntry: async (dateStr: string, userId?: string): Promise<DailyEntry> => {
+  // --- Single Entry (Cloud First) ---
+  getEntry: async (dateStr: string, userId: string): Promise<DailyEntry> => {
     const local = StorageService.loadLocal();
-    const cached = local.entries[dateStr] || { ...EMPTY_ENTRY, id: dateStr };
-    const uid = userId || auth.currentUser?.uid;
-
-    if (!uid || !db || cloudSyncSilenced) return cached;
+    
+    if (!userId || !db) {
+      return local.entries[dateStr] || { ...EMPTY_ENTRY, id: dateStr };
+    }
 
     try {
-      const snap = await getDoc(doc(db, 'users', uid, 'entries', dateStr));
+      const snap = await getDoc(doc(db, 'users', userId, 'entries', dateStr));
       if (snap.exists()) {
         const remote = snap.data() as DailyEntry;
+        // Merge with defaults to ensure UI doesn't break if schema changes
         const merged: DailyEntry = {
           ...EMPTY_ENTRY,
           ...remote,
-          id: dateStr
+          id: dateStr,
+          state: { ...EMPTY_ENTRY.state, ...remote.state },
+          effort: { ...EMPTY_ENTRY.effort, ...remote.effort },
+          achievements: { ...EMPTY_ENTRY.achievements, ...remote.achievements },
+          reflections: { ...EMPTY_ENTRY.reflections, ...remote.reflections },
+          memory: { ...EMPTY_ENTRY.memory, ...remote.memory },
+          future: { ...EMPTY_ENTRY.future, ...remote.future },
+          checklist: remote.checklist || {},
         };
         local.entries[dateStr] = merged;
         StorageService.saveLocal(local);
         return merged;
       }
     } catch (e: any) {
-      if (e.code === 'permission-denied') cloudSyncSilenced = true;
+      console.error(`[Storage] Cloud fetch error for ${dateStr}:`, e.message);
     }
-    return cached;
+    
+    return local.entries[dateStr] || { ...EMPTY_ENTRY, id: dateStr };
   },
 
-  saveEntry: async (entry: DailyEntry, userId?: string): Promise<void> => {
+  // --- Bulk Archive Fetch (Essential for Cross-Device) ---
+  getAllEntries: async (userId: string): Promise<DailyEntry[]> => {
+    if (!userId || !db) {
+      const local = StorageService.loadLocal();
+      return Object.values(local.entries).sort((a, b) => b.id.localeCompare(a.id));
+    }
+
+    try {
+      const q = query(collection(db, 'users', userId, 'entries'), orderBy('id', 'desc'));
+      const snap = await getDocs(q);
+      const entries = snap.docs.map(doc => doc.data() as DailyEntry);
+      
+      // Update local cache with full history
+      const local = StorageService.loadLocal();
+      entries.forEach(e => { local.entries[e.id] = e; });
+      StorageService.saveLocal(local);
+      
+      return entries;
+    } catch (e: any) {
+      console.error("[Storage] Global fetch failed:", e.message);
+      const local = StorageService.loadLocal();
+      return Object.values(local.entries).sort((a, b) => b.id.localeCompare(a.id));
+    }
+  },
+
+  saveEntry: async (entry: DailyEntry, userId: string): Promise<void> => {
+    // 1. Immediate local cache for UI responsiveness
     const local = StorageService.loadLocal();
     local.entries[entry.id] = entry;
     StorageService.saveLocal(local);
 
-    const uid = userId || auth.currentUser?.uid;
-    if (!uid || !db || cloudSyncSilenced) return;
+    if (!userId || !db) return;
 
+    // 2. Mandatory Cloud Write
     try {
-      await setDoc(doc(db, 'users', uid, 'entries', entry.id), { 
+      await setDoc(doc(db, 'users', userId, 'entries', entry.id), { 
         ...entry, 
-        userId: uid, 
+        userId, 
         updatedAt: Date.now() 
       }, { merge: true });
     } catch (e: any) {
-      if (e.code === 'permission-denied') cloudSyncSilenced = true;
+      console.error("[Storage] Firestore write failed:", e.message);
+      throw e; // Bubble up for UI "Error" state
     }
   },
 
-  isCloudAvailable: () => !!(isConfigured && auth.currentUser && !cloudSyncSilenced),
+  isCloudAvailable: () => !!(auth.currentUser && db),
 
   exportData: () => {
      const data = StorageService.loadLocal();

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { 
@@ -41,23 +40,23 @@ export const BottomNav = () => {
           `}
         >
           <div className="flex justify-around items-center border-b border-white/10 pb-5">
-             <NavLink to="/archive" className="flex flex-col items-center gap-1 group">
+             <NavLink to="/" className="flex flex-col items-center gap-1 group">
                 <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center group-hover:bg-white/20 transition-colors">
                   <Disc size={22} />
                 </div>
-                <span className="text-[10px] uppercase font-bold tracking-[0.2em] text-gray-500">Timeline</span>
-             </NavLink>
-             <NavLink to="/" className="flex flex-col items-center gap-1 group">
-                <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center group-hover:bg-white/20 transition-colors">
-                  <div className="w-2.5 h-2.5 bg-white rounded-full" />
-                </div>
-                <span className="text-[10px] uppercase font-bold tracking-[0.2em] text-gray-500">Tree</span>
+                <span className="text-[10px] uppercase font-bold tracking-[0.2em] text-gray-500">Archive</span>
              </NavLink>
              <NavLink to="/analytics" className="flex flex-col items-center gap-1 group">
                 <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center group-hover:bg-white/20 transition-colors">
                   <BarChart2 size={22} />
                 </div>
                 <span className="text-[10px] uppercase font-bold tracking-[0.2em] text-gray-500">Patterns</span>
+             </NavLink>
+             <NavLink to="/accounts" className="flex flex-col items-center gap-1 group">
+                <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center group-hover:bg-white/20 transition-colors">
+                  <UserCircle size={22} />
+                </div>
+                <span className="text-[10px] uppercase font-bold tracking-[0.2em] text-gray-500">Identity</span>
              </NavLink>
           </div>
 
@@ -75,13 +74,6 @@ export const BottomNav = () => {
                 <span className="text-[9px] font-bold uppercase tracking-wider">{cat.label}</span>
               </NavLink>
             ))}
-          </div>
-          
-          <div className="flex justify-center border-t border-white/5 pt-4">
-            <NavLink to="/accounts" className="flex items-center gap-2 text-gray-500 hover:text-white transition-colors">
-               <UserCircle size={16} />
-               <span className="text-[10px] uppercase font-bold tracking-widest">Vault Identity</span>
-            </NavLink>
           </div>
         </nav>
 

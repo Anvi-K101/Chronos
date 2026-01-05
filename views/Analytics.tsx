@@ -1,10 +1,10 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
-import { PageContainer, SectionHeader, Card, LoadingSpinner } from '../components/ui/Controls';
+import { PageContainer, SectionHeader, Card } from '../components/ui/Controls';
 import { StorageService } from '../services/storage';
 import { useAuth } from '../services/authContext';
 
+// --- Reusable Chart Component ---
 const LineChart = ({ data, color, height = 150, domain = [1, 10] }: { data: number[], color: string, height?: number, domain?: [number, number] }) => {
   const svgRef = useRef<SVGSVGElement>(null);
 
@@ -23,8 +23,9 @@ const LineChart = ({ data, color, height = 150, domain = [1, 10] }: { data: numb
     const line = d3.line<number>()
       .x((d, i) => xScale(i))
       .y(d => yScale(d || 0))
-      .curve(d3.curveMonotoneX);
+      .curve(d3.curveMonotoneX); // Smooth curves
 
+    // Area fill
     const area = d3.area<number>()
       .x((d, i) => xScale(i))
       .y0(h - padding)
@@ -44,6 +45,7 @@ const LineChart = ({ data, color, height = 150, domain = [1, 10] }: { data: numb
       .attr("stroke-width", 2)
       .attr("d", line);
 
+    // Dots
     svg.selectAll("circle")
        .data(data)
        .enter()
@@ -54,13 +56,13 @@ const LineChart = ({ data, color, height = 150, domain = [1, 10] }: { data: numb
        .attr("fill", "white")
        .attr("stroke", color);
 
-  }, [data, color, height, domain]);
+  }, [data, color, height]);
 
   return <svg ref={svgRef} className="w-full" style={{ height }} />;
 };
 
 export const Analytics = () => {
-  const { user, hydrated, loading: authLoading } = useAuth();
+  const { user } = useAuth();
   const [stats, setStats] = useState<any>({
     moods: [],
     anxiety: [],
@@ -68,37 +70,27 @@ export const Analytics = () => {
     work: [],
     totalEntries: 0
   });
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (authLoading || !hydrated) return;
+    // Load all data
+    const data = StorageService.loadLocal(); // In a real app we'd fetch range from FireStore
+    const entries = Object.values(data.entries).sort((a, b) => a.id.localeCompare(b.id));
 
-    const loadData = async () => {
-        setLoading(true);
-        const data = await StorageService.loadLocal();
-        const entries = Object.values(data.entries).sort((a, b) => a.id.localeCompare(b.id));
-
-        setStats({
-          moods: entries.map(e => e.state.mood || 5),
-          anxiety: entries.map(e => e.state.anxiety || 1),
-          sleep: entries.map(e => e.effort.sleepDuration || 0),
-          work: entries.map(e => e.effort.workHours || 0),
-          totalEntries: entries.length
-        });
-        setLoading(false);
-    };
-    
-    loadData();
-  }, [user, hydrated, authLoading]);
-
-  if (loading) return <PageContainer><LoadingSpinner message="Consulting History..." /></PageContainer>;
+    setStats({
+      moods: entries.map(e => e.state.mood || 5),
+      anxiety: entries.map(e => e.state.anxiety || 1),
+      sleep: entries.map(e => e.effort.sleepDuration || 0),
+      work: entries.map(e => e.effort.workHours || 0),
+      totalEntries: entries.length
+    });
+  }, [user]);
 
   if (stats.totalEntries === 0) {
      return (
         <PageContainer>
-           <SectionHeader title="Life Patterns" subtitle="Archive Overview" />
+           <SectionHeader title="Analytics" subtitle="2026 Overview" />
            <div className="text-center py-20 text-gray-400">
-              <p className="font-serif italic">Your vault is currently empty.</p>
+              <p>No data recorded yet.</p>
            </div>
         </PageContainer>
      );

@@ -1,65 +1,94 @@
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { DailyEntry, RatingScale as RatingType } from '../types';
-import { COMMON_EMOTIONS, EMPTY_ENTRY } from '../constants';
+import { COMMON_EMOTIONS, EMPTY_ENTRY, getLocalISODate } from '../constants';
 import { StorageService } from '../services/storage';
 import { useAuth } from '../services/authContext';
 import { 
   PageContainer, SectionHeader, Card, MoodLevelSelector, 
   Counter, RatingScale, TextInput, 
-  SaveIndicator, LoadingSpinner 
+  SaveIndicator 
 } from '../components/ui/Controls';
-import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 
 const DateNavigator = ({ date, setDate }: { date: string, setDate: (d: string) => void }) => {
   const changeDate = (days: number) => {
-    const d = new Date(date);
-    d.setDate(d.getDate() + days);
-    setDate(d.toISOString().split('T')[0]);
+    const [y, m, d] = date.split('-').map(Number);
+    const dateObj = new Date(y, m - 1, d);
+    dateObj.setDate(dateObj.getDate() + days);
+    setDate(getLocalISODate(dateObj));
   };
+  
   return (
     <div className="flex items-center justify-between bg-white rounded-xl p-2 mb-6 shadow-sm border border-gray-100">
-       <button type="button" onClick={(e) => { e.preventDefault(); changeDate(-1); }} className="p-2 hover:bg-stone-50 rounded-lg text-gray-400"><ChevronLeft size={20} /></button>
+       <button 
+         type="button" 
+         onClick={(e) => { e.preventDefault(); changeDate(-1); }} 
+         className="p-3 hover:bg-stone-50 rounded-lg text-gray-400 active:scale-90 transition-transform cursor-pointer"
+        >
+          <ChevronLeft size={20} />
+        </button>
        <div className="flex items-center gap-2">
           <Calendar size={14} className="text-organic-600" />
           <span className="font-serif font-bold text-ink text-sm">
-             {new Date(date).toLocaleDateString('en-US', { weekday: 'short', month: 'long', day: 'numeric', year: 'numeric' })}
+             {(() => {
+                const [y, m, d] = date.split('-').map(Number);
+                return new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'short', month: 'long', day: 'numeric' });
+             })()}
           </span>
        </div>
-       <button type="button" onClick={(e) => { e.preventDefault(); changeDate(1); }} className="p-2 hover:bg-stone-50 rounded-lg text-gray-400"><ChevronRight size={20} /></button>
+       <button 
+         type="button" 
+         onClick={(e) => { e.preventDefault(); changeDate(1); }} 
+         className="p-3 hover:bg-stone-50 rounded-lg text-gray-400 active:scale-90 transition-transform cursor-pointer"
+        >
+          <ChevronRight size={20} />
+        </button>
     </div>
   );
 };
 
 const useDailyEntry = (dateStr: string) => {
-  const { user, hydrated, loading: authLoading } = useAuth();
-  const [entry, setEntry] = useState<DailyEntry>({ ...EMPTY_ENTRY, id: dateStr });
-  const [isLoading, setIsLoading] = useState(true);
-  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'idle' | 'local' | 'error' | 'loading'>('idle');
+  const { user, loading: authLoading } = useAuth();
+  const [entry, setEntry] = useState<DailyEntry>(() => {
+    const local = StorageService.loadLocal();
+    return local.entries[dateStr] || { ...EMPTY_ENTRY, id: dateStr };
+  });
+  
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'idle' | 'local' | 'error'>('idle');
+  const [isCloudLoading, setIsCloudLoading] = useState(true);
   const userHasEditedRef = useRef(false);
   const saveTimeoutRef = useRef<number | null>(null);
 
+  // Sync logic
   useEffect(() => {
-    if (authLoading || !hydrated) return;
+    if (authLoading) return;
 
-    setIsLoading(true);
-    setSaveStatus('loading');
+    setIsCloudLoading(true);
     userHasEditedRef.current = false;
+    
+    // 1. Initial local load
+    const localData = StorageService.loadLocal();
+    setEntry(localData.entries[dateStr] || { ...EMPTY_ENTRY, id: dateStr });
 
-    let mounted = true;
-    StorageService.getEntry(dateStr, user?.uid).then(remote => {
-      if (mounted && !userHasEditedRef.current) {
-        setEntry(remote || { ...EMPTY_ENTRY, id: dateStr });
-        setIsLoading(false);
-        setSaveStatus('idle');
-      }
-    });
-
-    return () => { 
-      mounted = false; 
-      if (saveTimeoutRef.current) window.clearTimeout(saveTimeoutRef.current);
-    };
-  }, [dateStr, user, hydrated, authLoading]);
+    // 2. Cloud Fetch
+    if (user) {
+      let mounted = true;
+      StorageService.getEntry(dateStr, user.uid).then(remote => {
+        if (mounted) {
+          if (!userHasEditedRef.current) {
+            setEntry(remote);
+          }
+          setIsCloudLoading(false);
+        }
+      }).catch(err => {
+        console.error("Cloud Sync Failed:", err);
+        if (mounted) setIsCloudLoading(false);
+      });
+      return () => { mounted = false; };
+    } else {
+      setIsCloudLoading(false);
+    }
+  }, [dateStr, user, authLoading]);
 
   const triggerSave = useCallback((updatedEntry: DailyEntry) => {
     if (saveTimeoutRef.current) window.clearTimeout(saveTimeoutRef.current);
@@ -67,43 +96,53 @@ const useDailyEntry = (dateStr: string) => {
     setSaveStatus('saving');
     saveTimeoutRef.current = window.setTimeout(async () => {
       try {
-        await StorageService.saveEntry(updatedEntry, user?.uid);
-        setSaveStatus('saved');
-        setTimeout(() => setSaveStatus(prev => prev === 'saved' ? 'idle' : prev), 2000);
-      } catch (err) {
-        setSaveStatus('local');
-        setTimeout(() => setSaveStatus(prev => prev === 'local' ? 'idle' : prev), 3000);
+        if (user) {
+          await StorageService.saveEntry(updatedEntry, user.uid);
+          setSaveStatus('saved');
+        } else {
+          setSaveStatus('local');
+        }
+        setTimeout(() => setSaveStatus(prev => (prev === 'saved' || prev === 'local') ? 'idle' : prev), 2000);
+      } catch (err: any) {
+        console.error("Save Error:", err.message);
+        setSaveStatus(err.message.includes('permission') ? 'local' : 'error');
+        setTimeout(() => setSaveStatus('idle'), 4000);
       }
     }, 1000);
   }, [user]);
 
   const save = useCallback((updater: (prev: DailyEntry) => DailyEntry) => {
-    if (isLoading) return; // Prevent edits during sync
     userHasEditedRef.current = true;
     setEntry(prev => {
       const next = updater(prev);
       triggerSave(next);
       return next;
     });
-  }, [triggerSave, isLoading]);
+  }, [triggerSave]);
 
-  return { entry, save, saveStatus, isLoading };
+  return { entry, save, saveStatus, isCloudLoading };
 };
 
 const PageWrapper = ({ Component, title, subtitle }: { Component: any, title: string, subtitle: string }) => {
-   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-   const { entry, save, saveStatus, isLoading } = useDailyEntry(date);
+   const [date, setDate] = useState(getLocalISODate());
+   const { entry, save, saveStatus, isCloudLoading } = useDailyEntry(date);
 
    return (
      <PageContainer>
         <SaveIndicator status={saveStatus} />
         <DateNavigator date={date} setDate={setDate} />
         <SectionHeader title={title} subtitle={subtitle} />
-        {isLoading ? (
-          <LoadingSpinner message="Retrieving record..." />
-        ) : (
-          <Component entry={entry} save={save} />
+        
+        {isCloudLoading && (
+          <div className="flex items-center justify-center gap-2 mb-6 text-organic-300">
+            <Loader2 size={14} className="animate-spin" />
+            <span className="text-[10px] font-bold uppercase tracking-widest opacity-60">Checking Vault...</span>
+          </div>
         )}
+
+        <div className="animate-in fade-in duration-300">
+          <Component entry={entry} save={save} />
+        </div>
      </PageContainer>
    );
 };
@@ -131,7 +170,7 @@ const StateContent = ({ entry, save }: { entry: DailyEntry, save: any }) => (
                       }
                     }));
                   }}
-                  className={`px-4 py-2 rounded-full text-sm font-sans font-medium transition-all ${isActive ? 'bg-organic-600 text-white shadow-sm' : 'bg-gray-50 text-gray-600'}`}
+                  className={`px-4 py-2 rounded-full text-sm font-sans font-medium transition-all active:scale-95 cursor-pointer ${isActive ? 'bg-organic-600 text-white shadow-sm' : 'bg-stone-50 text-gray-500 hover:bg-stone-100'}`}
                 >
                   {emo}
                 </button>
@@ -185,7 +224,7 @@ const AchievementsContent = ({ entry, save }: { entry: DailyEntry, save: any }) 
 const ReflectionsContent = ({ entry, save }: { entry: DailyEntry, save: any }) => (
     <>
       <Card className="min-h-[50vh]">
-        <textarea className="w-full h-full min-h-[40vh] bg-transparent border-none p-0 text-xl font-serif text-ink leading-relaxed focus:ring-0 resize-none" value={entry.reflections.longForm} onChange={(e) => save((p: DailyEntry) => ({...p, reflections: {...p.reflections, longForm: e.target.value}}))} placeholder="Journal your thoughts..." />
+        <textarea className="w-full h-full min-h-[40vh] bg-transparent border-none p-0 text-xl font-serif text-ink leading-relaxed focus:ring-0 resize-none placeholder-stone-200" value={entry.reflections.longForm} onChange={(e) => save((p: DailyEntry) => ({...p, reflections: {...p.reflections, longForm: e.target.value}}))} placeholder="Journal your thoughts..." />
       </Card>
     </>
 );
