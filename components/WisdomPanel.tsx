@@ -14,7 +14,11 @@ export const WisdomPanel: React.FC<WisdomPanelProps> = ({ stats }) => {
   const [reflection, setReflection] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const generateInsight = async () => {
+  const generateInsight = async (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     if (stats.count === 0) return;
     setLoading(true);
     try {
@@ -68,8 +72,9 @@ export const WisdomPanel: React.FC<WisdomPanelProps> = ({ stats }) => {
       )}
       <div className="mt-4 flex justify-center">
         <button 
-          onClick={generateInsight}
-          className="text-[9px] font-bold uppercase tracking-[0.2em] text-organic-400 hover:text-organic-600 transition-colors flex items-center gap-1"
+          type="button"
+          onClick={(e) => generateInsight(e)}
+          className="text-[9px] font-bold uppercase tracking-[0.2em] text-organic-400 hover:text-organic-600 transition-colors flex items-center gap-1 outline-none"
         >
           <Sparkles size={10} /> Refresh Insight
         </button>

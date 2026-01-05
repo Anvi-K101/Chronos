@@ -1,31 +1,29 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../services/authContext';
-import { ArrowRight, ShieldCheck, TreePine, AlertCircle } from 'lucide-react';
+import { ArrowRight, ShieldCheck, TreePine, AlertCircle, MousePointer2, Layers, CheckCircle2, Loader2 } from 'lucide-react';
 
-export const Onboarding = () => {
+interface OnboardingProps {
+  forcedView?: 'welcome' | 'auth' | 'tutorial';
+  onTutorialEnd: () => void;
+}
+
+export const Onboarding: React.FC<OnboardingProps> = ({ forcedView, onTutorialEnd }) => {
   const { signInGoogle, signInEmail, signUpEmail } = useAuth();
-  const [view, setView] = useState<'welcome' | 'auth'>('welcome');
+  const [view, setView] = useState<'welcome' | 'auth' | 'tutorial'>(forcedView || 'welcome');
+  const [tutorialStep, setTutorialStep] = useState(0);
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('signup');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const getFriendlyErrorMessage = (err: any) => {
-    const code = err.code || '';
-    if (code === 'auth/wrong-password') return 'Incorrect password.';
-    if (code === 'auth/user-not-found') return 'Account not found.';
-    if (code === 'auth/invalid-credential') return 'Incorrect password.';
-    if (code === 'auth/email-already-in-use') return 'Email is already registered.';
-    if (code === 'auth/weak-password') return 'Password must be at least 6 characters.';
-    if (code === 'auth/invalid-email') return 'Please enter a valid email address.';
-    if (code === 'auth/too-many-requests') return 'Too many attempts. Please try again later.';
-    if (code === 'auth/network-request-failed') return 'Connection error. Check your vault access.';
-    return 'Identity verification failed. Please try again.';
-  };
+  useEffect(() => {
+    if (forcedView) setView(forcedView);
+  }, [forcedView]);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     setLoading(true);
     setError('');
     try {
@@ -33,34 +31,45 @@ export const Onboarding = () => {
         await signInEmail(email, password);
       } else {
         await signUpEmail(email, password);
+        setView('tutorial');
       }
     } catch (err: any) {
-      setError(getFriendlyErrorMessage(err));
+      setError(err.message || 'Identity verification failed.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      await signInGoogle();
+    } catch (err: any) {
+      setError(err.message || 'Google Auth failed.');
     }
   };
 
   if (view === 'welcome') {
     return (
       <div className="fixed inset-0 z-[100] bg-paper flex flex-col items-center justify-center p-8 text-center animate-in fade-in duration-1000">
-        <div className="w-16 h-16 bg-organic-100 rounded-3xl flex items-center justify-center mb-10 shadow-soft text-organic-700">
-          <TreePine size={32} />
+        <div className="w-20 h-20 bg-ink text-white rounded-[2rem] flex items-center justify-center mb-10 shadow-float">
+          <TreePine size={40} />
         </div>
-        <h1 className="font-serif text-5xl md:text-6xl text-ink font-bold tracking-tight mb-6">Chronos 2026</h1>
-        <p className="font-serif text-xl text-gray-500 italic max-w-md mb-12">
-          "A private operating system for your life's growth and reflection."
+        <h1 className="font-serif text-5xl md:text-7xl text-ink font-bold tracking-tighter mb-6">Chronos</h1>
+        <p className="font-serif text-xl text-stone-400 italic max-w-md mb-12">
+          "A silent archive for your life's expansion."
         </p>
         
         <div className="space-y-6 w-full max-w-xs">
           <button 
             type="button"
-            onClick={(e) => { e.preventDefault(); setView('auth'); }}
-            className="w-full py-4 bg-ink text-paper rounded-full font-sans font-bold uppercase tracking-widest text-xs hover:bg-organic-800 transition-all shadow-xl hover:shadow-2xl flex items-center justify-center gap-3"
+            onClick={(e) => { e.stopPropagation(); setView('auth'); }}
+            className="w-full py-5 bg-ink text-paper rounded-full font-sans font-black uppercase tracking-[0.4em] text-[10px] hover:bg-stone-800 transition-all shadow-xl flex items-center justify-center gap-3 outline-none"
           >
             Access Vault <ArrowRight size={14} />
           </button>
-          <div className="flex items-center justify-center gap-2 text-organic-400">
+          <div className="flex items-center justify-center gap-2 text-stone-300">
             <ShieldCheck size={14} />
             <span className="text-[10px] uppercase font-bold tracking-[0.2em]">End-to-End Privacy</span>
           </div>
@@ -69,74 +78,115 @@ export const Onboarding = () => {
     );
   }
 
+  if (view === 'tutorial') {
+    const steps = [
+      {
+        title: "The Heart",
+        text: "The center button at the bottom is your gateway. Click it once to open the main navigation menu and explore different facets of your archive.",
+        icon: <MousePointer2 size={32} className="text-ink" />
+      },
+      {
+        title: "Daily Nodes",
+        text: "Capture your 'Nodes' daily. Each category, like Vitality or Solitude, stores a unique dimension of your growth.",
+        icon: <Layers size={32} className="text-ink" />
+      },
+      {
+        title: "The Arbor",
+        text: "Watch your symbolic Tree of Life grow in real-time. The more you record, the more intricate its branches become.",
+        icon: <TreePine size={32} className="text-ink" />
+      },
+      {
+        title: "Rituals",
+        text: "Define your disciplines. You can set individual notification times for each ritual to stay aligned with your path.",
+        icon: <CheckCircle2 size={32} className="text-ink" />
+      }
+    ];
+
+    const current = steps[tutorialStep];
+
+    return (
+      <div className="fixed inset-0 z-[110] bg-paper flex flex-col items-center justify-center p-10 animate-in fade-in duration-500">
+         <div className="w-20 h-20 bg-stone-50 rounded-[2rem] flex items-center justify-center mb-10 border border-stone-100">
+            {current.icon}
+         </div>
+         <h2 className="font-serif text-4xl font-bold text-ink mb-4">{current.title}</h2>
+         <p className="font-serif text-lg text-stone-400 text-center max-w-sm leading-relaxed mb-12 italic text-balance">
+           "{current.text}"
+         </p>
+         
+         <div className="flex gap-2 mb-12">
+            {steps.map((_, i) => (
+              <div key={i} className={`h-1.5 rounded-full transition-all duration-500 ${i === tutorialStep ? 'w-8 bg-ink' : 'w-2 bg-stone-100'}`} />
+            ))}
+         </div>
+
+         <button 
+           type="button"
+           onClick={(e) => {
+             e.stopPropagation();
+             if (tutorialStep < steps.length - 1) {
+               setTutorialStep(tutorialStep + 1);
+             } else {
+               onTutorialEnd();
+             }
+           }}
+           className="px-10 py-5 bg-ink text-paper rounded-full font-sans font-black uppercase tracking-[0.4em] text-[11px] shadow-xl active:scale-95 transition-all outline-none"
+         >
+           {tutorialStep === steps.length - 1 ? "Enter Vault" : "Continue"}
+         </button>
+      </div>
+    )
+  }
+
   return (
     <div className="fixed inset-0 z-[100] bg-paper flex flex-col items-center justify-center p-8 animate-in slide-in-from-bottom-8 duration-500">
       <div className="w-full max-w-sm">
-        <h2 className="font-serif text-3xl font-bold text-ink mb-2">Vault Identity</h2>
-        <p className="text-gray-400 font-sans text-sm mb-8 uppercase tracking-widest">Confirm credentials</p>
+        <h2 className="font-serif text-4xl font-bold text-ink mb-2">Identity</h2>
+        <p className="text-stone-300 font-sans text-xs mb-10 uppercase tracking-[0.3em]">Confirm Vault Access</p>
 
         <button 
           type="button"
-          onClick={(e) => { e.preventDefault(); signInGoogle(); }}
-          className="w-full py-4 bg-white border border-stone-200 text-ink rounded-2xl font-sans font-bold uppercase tracking-widest text-xs hover:bg-stone-50 transition-all flex items-center justify-center gap-3 mb-6 shadow-sm"
+          onClick={handleGoogleSignIn}
+          className="w-full py-4 bg-white border border-stone-100 text-ink rounded-[1.5rem] font-sans font-black uppercase tracking-[0.2em] text-[10px] hover:bg-stone-50 transition-all flex items-center justify-center gap-3 mb-8 shadow-soft outline-none active:scale-95"
         >
           <img src="https://www.google.com/favicon.ico" className="w-4 h-4" alt="Google" />
-          Continue with Google
+          Authenticate with Google
         </button>
-
-        <div className="relative mb-6">
-          <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-stone-100"></div></div>
-          <div className="relative flex justify-center text-xs font-bold uppercase tracking-widest text-stone-300"><span className="bg-paper px-4">Secure Email</span></div>
-        </div>
 
         <form onSubmit={handleAuth} className="space-y-4">
           <input 
-            type="email" placeholder="Email Address" 
-            className="w-full p-4 bg-stone-50 border border-stone-100 rounded-2xl font-serif text-ink focus:outline-none focus:border-organic-400 transition-all"
+            type="email" placeholder="Email" 
+            onClick={(e) => e.stopPropagation()}
+            className="w-full p-4 bg-stone-50/50 border border-stone-100 rounded-[1.5rem] font-serif text-ink focus:outline-none focus:bg-white transition-all"
             value={email} onChange={e => setEmail(e.target.value)} required
           />
           <input 
             type="password" placeholder="Password" 
-            className="w-full p-4 bg-stone-50 border border-stone-100 rounded-2xl font-serif text-ink focus:outline-none focus:border-organic-400 transition-all"
+            onClick={(e) => e.stopPropagation()}
+            className="w-full p-4 bg-stone-50/50 border border-stone-100 rounded-[1.5rem] font-serif text-ink focus:outline-none focus:bg-white transition-all"
             value={password} onChange={e => setPassword(e.target.value)} required
           />
           
           {error && (
-            <div className="flex items-start gap-2 bg-red-50 p-3 rounded-xl border border-red-100 animate-in fade-in slide-in-from-top-1">
-              <AlertCircle size={14} className="text-red-500 mt-0.5 shrink-0" />
-              <p className="text-red-700 text-[11px] font-bold uppercase tracking-wide leading-tight">{error}</p>
+            <div className="bg-red-50 p-4 rounded-xl border border-red-100">
+              <p className="text-red-700 text-[10px] font-black uppercase tracking-widest">{error}</p>
             </div>
           )}
 
           <button 
             type="submit" disabled={loading}
-            className="w-full py-4 bg-organic-700 text-white rounded-2xl font-sans font-bold uppercase tracking-widest text-xs hover:bg-organic-800 transition-all shadow-lg flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-5 bg-ink text-white rounded-[1.5rem] font-sans font-black uppercase tracking-[0.4em] text-[10px] hover:bg-stone-800 transition-all shadow-lg flex items-center justify-center outline-none active:scale-95"
           >
-            {loading ? (
-              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            ) : (
-              authMode === 'signup' ? 'Create Vault' : 'Open Vault'
-            )}
+            {loading ? <Loader2 className="animate-spin" size={16} /> : (authMode === 'signup' ? 'Initiate New Archive' : 'Reopen Vault')}
           </button>
         </form>
 
-        <p className="text-center mt-8 text-xs font-bold uppercase tracking-widest text-gray-400">
-          {authMode === 'signup' ? 'Have a vault?' : 'Need a vault?'} 
-          <button 
-            type="button"
-            onClick={(e) => { e.preventDefault(); setAuthMode(authMode === 'login' ? 'signup' : 'login'); }}
-            className="ml-2 text-ink hover:text-organic-600 underline"
-          >
-            {authMode === 'login' ? 'Register' : 'Login'}
-          </button>
-        </p>
-
         <button 
           type="button"
-          onClick={(e) => { e.preventDefault(); setView('welcome'); }}
-          className="w-full mt-12 text-gray-300 hover:text-gray-500 text-xs font-bold uppercase tracking-widest transition-colors"
+          onClick={(e) => { e.stopPropagation(); setAuthMode(authMode === 'login' ? 'signup' : 'login'); }}
+          className="w-full mt-8 text-[10px] font-black uppercase tracking-[0.2em] text-stone-300 hover:text-ink transition-colors outline-none"
         >
-          Cancel
+          {authMode === 'signup' ? 'Already Have A Vault?' : 'Need A New Private Vault?'}
         </button>
       </div>
     </div>

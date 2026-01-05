@@ -1,3 +1,4 @@
+
 import { DailyEntry, AppData, ChecklistItemConfig } from '../types';
 import { EMPTY_ENTRY } from '../constants';
 import { db, auth, isConfigured } from './firebase';
@@ -5,10 +6,11 @@ import { doc, getDoc, setDoc, collection, getDocs, query, where, orderBy } from 
 
 const STORAGE_KEY = 'chronos_data_v1';
 
+// Added notificationsEnabled: false to satisfy ChecklistItemConfig type requirement
 const DEFAULT_CHECKLIST: ChecklistItemConfig[] = [
-  { id: 'journal', label: 'Write in Journal', enabled: true },
-  { id: 'move', label: 'Physical Movement', enabled: true },
-  { id: 'read', label: 'Read (15m)', enabled: true },
+  { id: 'journal', label: 'Write in Journal', enabled: true, notificationsEnabled: false },
+  { id: 'move', label: 'Physical Movement', enabled: true, notificationsEnabled: false },
+  { id: 'read', label: 'Read (15m)', enabled: true, notificationsEnabled: false },
 ];
 
 export const StorageService = {

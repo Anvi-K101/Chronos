@@ -3,7 +3,28 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>Chronos: Life Archive 2026</title>
+    <title>Chronos | Your Private Life Archive & OS</title>
+    
+    <!-- Primary Meta Tags -->
+    <meta name="title" content="Chronos | Your Private Life Archive & OS" />
+    <meta name="description" content="A high-performance, private, long-term personal operating system for daily tracking, reflection, and growth visualization." />
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://chronos-archive.vercel.app/" />
+    <meta property="og:title" content="Chronos | Your Private Life Archive & OS" />
+    <meta property="og:description" content="Archive your life's nodes. Secure, private, and visually evolving with your growth." />
+    <meta property="og:image" content="https://chronos-archive.vercel.app/og-image.png" />
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:url" content="https://chronos-archive.vercel.app/" />
+    <meta property="twitter:title" content="Chronos | Your Private Life Archive & OS" />
+    <meta property="twitter:description" content="Archive your life's nodes. Secure, private, and visually evolving with your growth." />
+    <meta property="twitter:image" content="https://chronos-archive.vercel.app/og-image.png" />
+
+    <link rel="canonical" href="https://chronos-archive.vercel.app/" />
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
@@ -94,6 +115,11 @@
       input[type=range]:focus {
         outline: none;
       }
+      /* Visible focus states for accessibility */
+      button:focus-visible, input:focus-visible, textarea:focus-visible {
+        outline: 2px solid #568456;
+        outline-offset: 2px;
+      }
     </style>
   <script type="importmap">
 {
@@ -113,6 +139,12 @@
 </script>
 </head>
   <body>
+    <noscript>
+      <div style="padding: 2rem; text-align: center; font-family: sans-serif;">
+        <h1>Chronos requires JavaScript</h1>
+        <p>Please enable JavaScript in your browser to access your private vault.</p>
+      </div>
+    </noscript>
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
   </body>

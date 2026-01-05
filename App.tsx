@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Home } from './views/Home';
 import { BottomNav } from './components/Navigation';
 import { Analytics } from './views/Analytics';
@@ -7,12 +7,35 @@ import { ChecklistPage } from './views/ChecklistPage';
 import { AuthProvider, useAuth } from './services/authContext';
 import { Onboarding } from './views/Onboarding';
 import { Accounts } from './views/Accounts';
+import { GrowthPage } from './views/GrowthPage';
 import { 
   StatePage, EffortPage, AchievementsPage, 
   ReflectionsPage, MemoriesPage, FuturePage 
 } from './views/CategoryPages';
 import { StorageService } from './services/storage';
-import { Loader2, Share2, Calendar as CalIcon } from 'lucide-react';
+import { Loader2, Share2, Calendar as CalIcon, AlertTriangle, Home as HomeIcon } from 'lucide-react';
+
+const NotFound = () => {
+  const navigate = useNavigate();
+  return (
+    <div className="min-h-screen bg-paper flex flex-col items-center justify-center p-8 text-center">
+      <div className="w-20 h-20 bg-stone-100 rounded-[2rem] flex items-center justify-center mb-8 text-stone-400">
+        <AlertTriangle size={32} />
+      </div>
+      <h1 className="font-serif text-4xl font-bold text-ink mb-4">Node Not Found</h1>
+      <p className="font-serif text-lg text-stone-400 italic mb-12 max-w-xs">
+        "This coordinate in time does not exist within your archive."
+      </p>
+      <button 
+        type="button"
+        onClick={() => navigate('/')}
+        className="px-10 py-5 bg-ink text-paper rounded-full font-sans font-black uppercase tracking-[0.4em] text-[11px] shadow-xl hover:-translate-y-1 active:scale-95 transition-all outline-none flex items-center gap-3"
+      >
+        <HomeIcon size={16} /> Return to Core
+      </button>
+    </div>
+  );
+};
 
 const Archive = () => {
   const { user } = useAuth();
@@ -31,7 +54,9 @@ const Archive = () => {
     return () => { mounted = false; };
   }, [user]);
 
-  const handleShare = async (entry: any) => {
+  const handleShare = async (entry: any, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     const dateStr = new Date(entry.id + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
     const text = `Chronos Archive: ${dateStr}\n\n` +
                  `Mood: ${entry.state.mood || 'N/A'}\n` +
@@ -81,9 +106,9 @@ const Archive = () => {
                    </div>
                    <button 
                      type="button"
-                     onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleShare(entry); }}
+                     onClick={(e) => handleShare(entry, e)}
                      className="p-3.5 bg-stone-50 rounded-2xl text-stone-400 hover:text-organic-600 hover:bg-organic-50 active:scale-90 transition-all outline-none border border-transparent hover:border-organic-100/50"
-                     title="Send to Journal"
+                     aria-label="Share this entry"
                    >
                      <Share2 size={18} />
                    </button>
@@ -120,20 +145,49 @@ const Archive = () => {
 
 const ProtectedContent = () => {
   const { user, loading } = useAuth();
+  const location = useLocation();
+  const [tutorialComplete, setTutorialComplete] = useState(() => localStorage.getItem('tutorial_done') === 'true');
+
+  useEffect(() => {
+    // Dynamic page title for SEO and user context
+    const path = location.pathname;
+    let title = "Chronos | Life Archive";
+    if (path === "/") title = "Core | Chronos";
+    else if (path === "/growth") title = "Arbor | Chronos";
+    else if (path === "/archive") title = "Archives | Chronos";
+    else if (path === "/accounts") title = "Identity | Chronos";
+    else if (path === "/checklist") title = "Rituals | Chronos";
+    else if (path.startsWith("/log/")) title = "Recording Node | Chronos";
+    
+    document.title = title;
+  }, [location]);
+
   if (loading) return (
     <div className="min-h-screen bg-paper flex flex-col items-center justify-center gap-4 text-organic-400">
       <Loader2 size={28} className="animate-spin opacity-20" />
       <span className="text-[10px] font-black uppercase tracking-[0.5em] opacity-30">Awakening Vault</span>
     </div>
   );
-  if (!user) return <Onboarding />;
+
+  if (!user) {
+    return <Onboarding forcedView="welcome" onTutorialEnd={() => setTutorialComplete(true)} />;
+  }
+
+  if (!tutorialComplete) {
+    return <Onboarding forcedView="tutorial" onTutorialEnd={() => {
+        setTutorialComplete(true);
+        localStorage.setItem('tutorial_done', 'true');
+    }} />;
+  }
+
   return (
-    <div className="bg-paper min-h-screen font-sans selection:bg-organic-100 selection:text-organic-900 no-tap-highlight">
+    <main className="bg-paper min-h-screen font-sans selection:bg-organic-100 selection:text-organic-900 no-tap-highlight">
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/analytics" element={<Analytics />} />
         <Route path="/checklist" element={<ChecklistPage />} />
         <Route path="/accounts" element={<Accounts />} />
+        <Route path="/growth" element={<GrowthPage />} />
         <Route path="/log/state" element={<StatePage />} />
         <Route path="/log/effort" element={<EffortPage />} />
         <Route path="/log/achievements" element={<AchievementsPage />} />
@@ -141,10 +195,11 @@ const ProtectedContent = () => {
         <Route path="/log/memories" element={<MemoriesPage />} />
         <Route path="/log/future" element={<FuturePage />} />
         <Route path="/archive" element={<Archive />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="/404" element={<NotFound />} />
+        <Route path="*" element={<Navigate to="/404" replace />} />
       </Routes>
       <BottomNav />
-    </div>
+    </main>
   );
 };
 

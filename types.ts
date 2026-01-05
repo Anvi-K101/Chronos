@@ -89,6 +89,7 @@ export interface ChecklistItemConfig {
   id: string;
   label: string;
   notifyTime?: string; // HH:MM
+  notificationsEnabled: boolean;
   enabled: boolean;
 }
 
