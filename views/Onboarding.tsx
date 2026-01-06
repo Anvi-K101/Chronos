@@ -1,10 +1,11 @@
+
 import React, { useState } from 'react';
 import { useAuth } from '../services/authContext';
-import { ArrowRight, ShieldCheck, TreePine, AlertCircle, MousePointer2, Layers, CheckCircle2, Loader2 } from 'lucide-react';
+import { ArrowRight, ShieldCheck, TreePine, AlertCircle, MousePointer2, Layers, CheckCircle2, Loader2, Info } from 'lucide-react';
 
 export const Onboarding = () => {
   const { signInGoogle, signInEmail, signUpEmail } = useAuth();
-  const [view, setView] = useState<'welcome' | 'auth' | 'tutorial'>('welcome');
+  const [view, setView] = useState<'welcome' | 'auth' | 'tutorial' | 'about'>('welcome');
   const [tutorialStep, setTutorialStep] = useState(0);
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('signup');
   const [email, setEmail] = useState('');
@@ -32,16 +33,24 @@ export const Onboarding = () => {
 
   if (view === 'welcome') {
     return (
-      <div className="fixed inset-0 z-[100] bg-paper flex flex-col items-center justify-center p-8 text-center animate-in fade-in duration-1000">
-        <div className="w-20 h-20 bg-ink text-white rounded-[2rem] flex items-center justify-center mb-10 shadow-float">
+      <div className="fixed inset-0 z-[100] bg-paper flex flex-col items-center justify-center p-8 text-center animate-in fade-in duration-1000 overflow-y-auto">
+        <div className="w-20 h-20 bg-ink text-white rounded-[2rem] flex items-center justify-center mb-10 shadow-float shrink-0">
           <TreePine size={40} />
         </div>
-        <h1 className="font-serif text-5xl md:text-7xl text-ink font-bold tracking-tighter mb-6">Chronos</h1>
-        <p className="font-serif text-xl text-stone-400 italic max-w-md mb-12">
+        <h1 className="font-serif text-5xl md:text-7xl text-ink font-bold tracking-tighter mb-4">Chronos</h1>
+        <p className="font-serif text-xl text-stone-400 italic max-w-md mb-8">
           "A silent archive for your life's expansion."
         </p>
+
+        <div className="max-w-sm mb-12 animate-in fade-in slide-in-from-bottom-4 duration-1000 delay-300">
+           <p className="font-sans text-[11px] leading-relaxed text-stone-500 uppercase tracking-[0.1em] font-medium text-balance">
+             Chronos is a personal operating system designed to map your progress throughout the year. 
+             By recording daily nodes, you gradually build a visual and data-driven history of your 
+             mental state, achievements, and evolution.
+           </p>
+        </div>
         
-        <div className="space-y-6 w-full max-w-xs">
+        <div className="space-y-4 w-full max-w-xs shrink-0">
           <button 
             type="button"
             onClick={() => setView('auth')}
@@ -49,10 +58,50 @@ export const Onboarding = () => {
           >
             Access Vault <ArrowRight size={14} />
           </button>
-          <div className="flex items-center justify-center gap-2 text-stone-300">
+          
+          <button 
+            type="button"
+            onClick={() => setView('about')}
+            className="w-full py-4 bg-white border border-stone-100 text-stone-400 rounded-full font-sans font-black uppercase tracking-[0.3em] text-[9px] hover:text-ink transition-all flex items-center justify-center gap-2"
+          >
+            <Info size={12} /> The Concept
+          </button>
+
+          <div className="flex items-center justify-center gap-2 text-stone-300 pt-4">
             <ShieldCheck size={14} />
             <span className="text-[10px] uppercase font-bold tracking-[0.2em]">End-to-End Privacy</span>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (view === 'about') {
+    return (
+      <div className="fixed inset-0 z-[120] bg-paper flex flex-col items-center justify-center p-8 animate-in fade-in zoom-in-95 duration-500">
+        <div className="max-w-md text-center">
+          <h2 className="font-serif text-4xl font-bold text-ink mb-6">The Concept</h2>
+          <div className="space-y-6 text-left">
+            <div className="p-6 bg-white rounded-3xl border border-stone-100 shadow-soft">
+              <h4 className="font-serif text-lg font-bold text-ink mb-2">Daily Persistence</h4>
+              <p className="font-serif text-sm text-stone-500 leading-relaxed italic">
+                Chronos invites you to spend five minutes each day reflecting on your biological and mental state. These nodes aggregate into a deep history of your growth.
+              </p>
+            </div>
+            <div className="p-6 bg-white rounded-3xl border border-stone-100 shadow-soft">
+              <h4 className="font-serif text-lg font-bold text-ink mb-2">Long-Term Vision</h4>
+              <p className="font-serif text-sm text-stone-500 leading-relaxed italic">
+                Observe patterns that only become visible over months. The "Arbor" visualizes your consistency, showing you exactly where you've invested your energy.
+              </p>
+            </div>
+          </div>
+          <button 
+            type="button"
+            onClick={() => setView('welcome')}
+            className="mt-12 text-[10px] font-black uppercase tracking-[0.4em] text-stone-300 hover:text-ink transition-colors"
+          >
+            Back to Entry
+          </button>
         </div>
       </div>
     );
@@ -158,13 +207,23 @@ export const Onboarding = () => {
           </button>
         </form>
 
-        <button 
-          type="button"
-          onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')}
-          className="w-full mt-8 text-[10px] font-black uppercase tracking-[0.2em] text-stone-300 hover:text-ink transition-colors outline-none"
-        >
-          {authMode === 'signup' ? 'Already Have A Vault?' : 'Need A New Private Vault?'}
-        </button>
+        <div className="flex flex-col gap-4 mt-8">
+          <button 
+            type="button"
+            onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')}
+            className="text-[10px] font-black uppercase tracking-[0.2em] text-stone-300 hover:text-ink transition-colors outline-none"
+          >
+            {authMode === 'signup' ? 'Already Have A Vault?' : 'Need A New Private Vault?'}
+          </button>
+          
+          <button 
+            type="button"
+            onClick={() => setView('welcome')}
+            className="text-[10px] font-black uppercase tracking-[0.2em] text-stone-200 hover:text-stone-400 transition-colors outline-none"
+          >
+            Cancel
+          </button>
+        </div>
       </div>
     </div>
   );

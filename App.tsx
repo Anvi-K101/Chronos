@@ -8,6 +8,7 @@ import { ChecklistPage } from './views/ChecklistPage';
 import { AuthProvider, useAuth } from './services/authContext';
 import { Onboarding } from './views/Onboarding';
 import { Accounts } from './views/Accounts';
+import { AboutPage } from './views/AboutPage';
 import { GrowthPage } from './views/GrowthPage';
 import { 
   StatePage, EffortPage, AchievementsPage, 
@@ -136,6 +137,7 @@ const ProtectedContent = () => {
         <Route path="/analytics" element={<Analytics />} />
         <Route path="/checklist" element={<ChecklistPage />} />
         <Route path="/accounts" element={<Accounts />} />
+        <Route path="/about" element={<AboutPage />} />
         <Route path="/growth" element={<GrowthPage />} />
         <Route path="/log/state" element={<StatePage />} />
         <Route path="/log/effort" element={<EffortPage />} />

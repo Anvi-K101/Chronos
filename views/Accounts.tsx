@@ -1,9 +1,11 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../services/authContext';
 import { StorageService } from '../services/storage';
 import { PageContainer, SectionHeader, Card } from '../components/ui/Controls';
+import { Link } from 'react-router-dom';
 import { 
-  User, ShieldCheck, LogOut, Download, AlertCircle, Share2, Calendar 
+  User, ShieldCheck, LogOut, Download, AlertCircle, Share2, Calendar, Info
 } from 'lucide-react';
 
 export const Accounts = () => {
@@ -93,16 +95,19 @@ export const Accounts = () => {
            </div>
         </Card>
 
-        <Card title="Integrity">
+        <Card title="Archive Info">
            <div className="space-y-4 py-2">
               <div className="flex justify-between items-center text-xs font-serif">
-                <span className="text-stone-400">Archive Size</span>
-                <span className="font-bold text-ink bg-stone-50 px-3 py-1 rounded-lg">{stats.totalEntries} Nodes</span>
+                <span className="text-stone-400">Total Nodes</span>
+                <span className="font-bold text-ink bg-stone-50 px-3 py-1 rounded-lg">{stats.totalEntries}</span>
               </div>
-              <div className="flex justify-between items-center text-xs font-serif pt-4 border-t border-stone-100/50">
-                <span className="text-stone-400">Vault Protocol</span>
-                <span className="font-black text-organic-600 text-[10px] uppercase tracking-widest bg-organic-50 px-3 py-1 rounded-lg">Isolated</span>
-              </div>
+              <Link 
+                to="/about"
+                className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-organic-600 hover:text-organic-800 transition-colors pt-4 border-t border-stone-100/50"
+              >
+                <span>The Concept</span>
+                <Info size={14} />
+              </Link>
            </div>
         </Card>
       </div>
